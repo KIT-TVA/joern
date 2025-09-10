@@ -6,9 +6,7 @@ import io.joern.x2cpg.Ast
 import io.joern.x2cpg.ValidationMode
 import io.joern.x2cpg.frontendspecific.swiftsrc2cpg.Defines
 import io.shiftleft.codepropertygraph.generated.nodes.*
-import io.shiftleft.codepropertygraph.generated.DispatchTypes
-import io.shiftleft.codepropertygraph.generated.ModifierTypes
-import io.shiftleft.codepropertygraph.generated.Operators
+import io.shiftleft.codepropertygraph.generated.{DispatchTypes, EdgeTypes, ModifierTypes, Operators}
 
 trait AstNodeBuilder(implicit withSchemaValidation: ValidationMode) { this: AstCreator =>
 
@@ -150,12 +148,12 @@ trait AstNodeBuilder(implicit withSchemaValidation: ValidationMode) { this: AstC
       .columnNumber(column)
   }
 
-  protected def literalNode(node: SwiftNode, code: String, dynamicTypeOption: Option[String]): NewLiteral = {
-    val typeFullName = dynamicTypeOption match {
+  protected def literalNode(node: SwiftNode, code: String, possibleTypes: Option[String]): NewLiteral = {
+    val typeFullName = possibleTypes match {
       case Some(value) if Defines.SwiftTypes.contains(value) => value
       case _                                                 => Defines.Any
     }
-    literalNode(node, code, typeFullName, dynamicTypeOption.toList)
+    literalNode(node, code, typeFullName).possibleTypes(possibleTypes.toList)
   }
 
   protected def createAssignmentCallAst(
@@ -170,7 +168,7 @@ trait AstNodeBuilder(implicit withSchemaValidation: ValidationMode) { this: AstC
     callAst(callNode, arguments)
   }
 
-  protected def typeHintForThisExpression(): Seq[String] = {
+  private def typeHintForThisExpression(): Seq[String] = {
     dynamicInstanceTypeStack.headOption match {
       case Some(tpe) => Seq(tpe)
       case None      => methodAstParentStack.collectFirst { case t: NewTypeDecl => t.fullName }.toSeq
@@ -178,11 +176,11 @@ trait AstNodeBuilder(implicit withSchemaValidation: ValidationMode) { this: AstC
   }
 
   protected def identifierNode(node: SwiftNode, name: String): NewIdentifier = {
-    val dynamicInstanceTypeOption = name match {
-      case "this" | "self" | "Self" => typeHintForThisExpression().headOption
-      case _                        => None
+    val tpe = name match {
+      case "this" | "self" | "Self" => typeHintForThisExpression().headOption.getOrElse(Defines.Any)
+      case _                        => Defines.Any
     }
-    identifierNode(node, name, name, Defines.Any, dynamicInstanceTypeOption.toList)
+    identifierNode(node, name, name, tpe)
   }
 
   def staticInitMethodAstAndBlock(
@@ -226,30 +224,41 @@ trait AstNodeBuilder(implicit withSchemaValidation: ValidationMode) { this: AstC
     .columnNumber(column)
     .typeFullName(Defines.Any)
 
-  protected def createFunctionTypeAndTypeDeclAst(
-    node: SwiftNode,
-    methodNode: NewMethod,
-    methodName: String,
-    methodFullName: String
-  ): Ast = {
-    registerType(methodFullName)
+  protected def createFunctionTypeAndTypeDecl(method: NewMethod): Ast = {
+    val parentNode: NewTypeDecl = methodAstParentStack.collectFirst { case t: NewTypeDecl => t }.get
+    method.astParentFullName = parentNode.fullName
+    method.astParentType = parentNode.label
+    val functionBinding = NewBinding().name(method.name).methodFullName(method.fullName).signature(method.signature)
+    Ast(functionBinding).withBindsEdge(parentNode, functionBinding).withRefEdge(functionBinding, method)
+  }
 
+  protected def createFunctionTypeAndTypeDecl(node: SwiftNode, methodNode: NewMethod): Unit = {
+    registerType(methodNode.fullName)
     val (astParentType, astParentFullName) = astParentInfo()
-    val functionTypeDeclNode =
-      typeDeclNode(
-        node,
-        methodName,
-        methodFullName,
-        parserResult.filename,
-        methodName,
-        astParentType = astParentType,
-        astParentFullName = astParentFullName,
-        List(Defines.Any)
-      )
-    Ast.storeInDiffGraph(Ast(functionTypeDeclNode), diffGraph)
+    val methodTypeDeclNode = typeDeclNode(
+      node,
+      methodNode.name,
+      methodNode.fullName,
+      methodNode.filename,
+      methodNode.fullName,
+      astParentType,
+      astParentFullName
+    )
 
-    val bindingNode = NewBinding().name("").signature("")
-    Ast(functionTypeDeclNode).withBindsEdge(functionTypeDeclNode, bindingNode).withRefEdge(bindingNode, methodNode)
+    methodNode.astParentFullName = astParentFullName
+    methodNode.astParentType = astParentType
+
+    val functionBinding = NewBinding()
+      .name(methodNode.name)
+      .methodFullName(methodNode.fullName)
+      .signature(methodNode.signature)
+
+    val functionBindAst = Ast(functionBinding)
+      .withBindsEdge(methodTypeDeclNode, functionBinding)
+      .withRefEdge(functionBinding, methodNode)
+
+    Ast.storeInDiffGraph(Ast(methodTypeDeclNode), diffGraph)
+    Ast.storeInDiffGraph(functionBindAst, diffGraph)
   }
 
 }

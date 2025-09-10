@@ -17,10 +17,13 @@ object Defines {
   val Bool: String            = "Bool"
   val Function: String        = "Function"
   val Array: String           = "Array"
+  val Dictionary: String      = "Dictionary"
   val Nil: String             = "Nil"
   val GlobalNamespace: String = NamespaceTraversal.globalNamespaceName
+  val DuplicateSuffix: String = "<duplicate>"
 
-  val SwiftTypes: List[String] = List(Any, Nil, Character, String, Int, Float, Double, Bool, Function, Array)
+  val SwiftTypes: List[String] =
+    List(Any, Nil, Character, String, Int, Float, Double, Bool, Function, Array, Dictionary)
 
   val PostfixOperatorMap: Map[String, String] = Map(
     "++"  -> Operators.postIncrement,
@@ -45,6 +48,7 @@ object Defines {
     ">"   -> Operators.greaterThan,
     "=="  -> Operators.equals,
     "%"   -> Operators.modulo,
+    "&"   -> Operators.addressOf,
     "..." -> "<operator>.splat"
   ).withDefault { key =>
     logger.info(s"Prefix operator '$key' not handled yet")
@@ -86,11 +90,11 @@ object Defines {
     "!="   -> Operators.notEquals,
     "==="  -> Operators.equals,
     "!=="  -> Operators.notEquals,
-    "&+"   -> Operators.plus,
-    "+"    -> Operators.plus,
+    "&+"   -> Operators.addition,
+    "+"    -> Operators.addition,
     "&+="  -> Operators.assignmentPlus,
-    "&-"   -> Operators.minus,
-    "-"    -> Operators.minus,
+    "&-"   -> Operators.subtraction,
+    "-"    -> Operators.subtraction,
     "&-="  -> Operators.assignmentMinus,
     "&/"   -> Operators.division,
     "/"    -> Operators.division,
