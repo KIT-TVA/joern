@@ -1,7 +1,8 @@
 package io.joern.c2cpg.variability
 
 import flatgraph.Graph
-import io.joern.c2cpg.astcreation.VAstCreator
+import io.joern.c2cpg.astcreation.{AstCreator, CGlobal, VAstCreator}
+import io.joern.c2cpg.testfixtures.C2CpgSuite
 import io.joern.dataflowengineoss.dotgenerator.DotCpg14Generator
 import io.shiftleft.semanticcpg.utils.FileUtil.*
 import io.shiftleft.semanticcpg.utils.FileUtil
@@ -19,132 +20,57 @@ import io.shiftleft.codepropertygraph.generated.{Cpg, DiffGraphBuilder, nodes}
 import io.shiftleft.codepropertygraph.generated.nodes.*
 import superc.SuperC
 
-object TrivialCpgTest {
-    /*
-    def createTrivialCpg(): Cpg = {
-        val cpg = Cpg.empty
-        val diffGraph = Cpg.newDiffGraphBuilder
+import scala.collection.mutable.ListBuffer
+import scala.jdk.CollectionConverters.IteratorHasAsScala
 
-        // Add a file node (required for a valid CPG)
-        val fileNode = NewFile()
-          .name("trivial.scala")
-          .content("1 == 1")
-        diffGraph.addNode(fileNode)
+class TrivialCpgTest extends C2CpgSuite {
 
-        // Add a method to contain our expression
-        val methodNode = NewMethod()
-          .name("printMethod")
-          .fullName("printMethod")
-          .code("println(\"Hello World\")")
-        diffGraph.addNode(methodNode)
 
-        // Add the println call
-        val printCallNode = NewCall()
-          .name("println")
-          .methodFullName("scala.Predef.println")
-          .code("println(\"Hello World\")")
-          .typeFullName("Unit")
-        diffGraph.addNode(printCallNode)
+  val cCode =
+    """
 
-        // Add string literal for the argument
-        val stringLiteral = NewLiteral()
-          .code("\"Hello World\"")
-          .typeFullName("String")
-        diffGraph.addNode(stringLiteral)
-
-        // Add method parameter if needed
-        val parameterNode = NewMethodParameterIn()
-          .name("x")
-          .typeFullName("Any")
-          .order(1)
-        diffGraph.addNode(parameterNode)
-
-        // Add method return node
-        val methodReturnNode = NewMethodReturn()
-          .typeFullName("Unit")
-        diffGraph.addNode(methodReturnNode)
-
-        // Create AST edges to connect the nodes
-        diffGraph.addEdge(methodNode, printCallNode, EdgeTypes.AST)
-        diffGraph.addEdge(printCallNode, stringLiteral, EdgeTypes.AST)
-        diffGraph.addEdge(methodNode, parameterNode, EdgeTypes.AST)
-        diffGraph.addEdge(methodNode, methodReturnNode, EdgeTypes.AST)
-
-        // Add argument edge for the string literal
-        diffGraph.addEdge(printCallNode, stringLiteral, EdgeTypes.ARGUMENT)
-
-        // Apply the changes to the CPG
-        DiffGraphApplier.applyDiff(cpg.graph, diffGraph)
-
-        cpg
-    }
-*/
-    def main(args: Array[String]): Unit = {
-        val sup = new SuperC()
-        sup.init()
-        sup.prepare()
-        val cCode =
-            """
-            #ifdef TEST
-            struct A {
-            int x;
-            };
-            #else
-            struct A {
-            float y;
-            };
-            #endif
-
-                  int main() {
-                      struct A a;
+                  int main(char a, int b) {
+                     #ifdef MACRO
+                          printf("a");
+                     #else
+                          a = a + 1;
+                          printf("b");
+                    #endif
+                    return a;
                   }
                   """
+  val stringReader = new StringReader(cCode)
+  val dummyFile = new File("test.c")
 
-        val stringReader = new StringReader(cCode)
-        val dummyFile = new File("test.c")
-
-        val result = sup.parse(stringReader, dummyFile)
-
-        val vAstCreator = VAstCreator("test.c", result)
-        val diffGraph = vAstCreator.createAst()
-
-        val cpg = newEmptyCpg(None)
-        val traversal = cpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
-
-        flatgraph.DiffGraphApplier.applyDiff(cpg.graph, diffGraph)
-        cpg.graph
-
-          //val astDotGenerator = DotCpg14Generator()
-          //val astDotString = astDotGenerator.generate(cpg.)
+  val sup = new SuperC()
+  sup.init()
+  sup.prepare()
+  val superCParseResult = sup.parse(stringReader, dummyFile)
+  var globalSuperC: CGlobal = new CGlobal()
+  val vAstCreator = VAstCreator("test.c", globalSuperC, superCParseResult)
+  val diffGraph = vAstCreator.createAst()
+  val superCpg = newEmptyCpg(None)
+  flatgraph.DiffGraphApplier.applyDiff(superCpg.graph, diffGraph)
 
 
-          //cpg.method.ast.isControlStructure.code(".*y > 42.*").dotAst.l
-          cpg.close()
+  // Get dot representation
+  val astDotGenerator = DotCpg14Generator
 
-        //diffGraph.build(graph)
-        //val cpg = new Cpg(graph)
+  val superCTraversal = superCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
+  val superCAstDotString = DotCpg14Generator.toDotCpg14(superCTraversal)
+  superCpg.close()
 
-        result.getNode(0).getNode(0).getNode(1) match {
-            case node: GNode if node.hasName("FunctionDefinition") => print(node);
-            case _ => print("not FunctionDef: ")
-                print
+  val cCpg = code(cCode)
+  val cTraversal = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
+  val cAstDotString = DotCpg14Generator.toDotCpg14(cTraversal)
+  cCpg.close()
+  
+  val superCSstring = superCAstDotString.mkString
+  val cString = cAstDotString.mkString
+  println("SuperC:")
+  print(superCSstring)
+  println()
+  println("JoernC:")
+  print(cString)
 
-        }
-        System.out.println("Parse result: " + result)
-
-        /*val cpg = createTrivialCpg()
-        try {
-            val nodeStarters = new CpgNodeStarters(cpg)
-            println(s"Total nodes: ${nodeStarters.all.map(_.toString).toString()}")
-            println(s"Calls: ${nodeStarters.call.code.toList}")
-            println(s"Literals: ${nodeStarters.literal.code.toList}")
-            ///print(cpg.graph.allNodes().map(_.toString))
-            cpg.graph.allNodes.foreach { node =>
-                println(s"${node.label}: ${node}")
-            }
-
-        } finally {
-            cpg.close()
-        }*/
-    }
 }
