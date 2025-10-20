@@ -25,11 +25,8 @@ import scala.jdk.CollectionConverters.IteratorHasAsScala
 
 class TrivialCpgTest extends C2CpgSuite {
 
-
-  val cCode =
-    """
-
-                  int main(char a, int b) {
+/*
+* int main(char a, int b) {
                      #ifdef MACRO
                           printf("a");
                      #else
@@ -38,6 +35,38 @@ class TrivialCpgTest extends C2CpgSuite {
                     #endif
                     return a;
                   }
+* */
+
+  /*    """
+
+                  int main(char a, int b) {
+    if (a > 9){
+      printf("9");
+    }
+    #ifdef MACRO
+      if
+    #else
+      else if
+    #endif
+    (a == b){
+     printf("a");
+    }
+    else{
+     printf("b");
+    }
+
+                    return a;
+                  }
+                  """*/
+  val cCode =
+    """
+
+                  int main(char a, int b) {
+    printf("1");
+            if (a > 9){
+      printf("9");
+    }
+  return a;}
                   """
   val stringReader = new StringReader(cCode)
   val dummyFile = new File("test.c")
