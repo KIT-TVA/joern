@@ -12,12 +12,14 @@ libraryDependencies ++= Seq(
   "io.shiftleft"     %% "codepropertygraph" % Versions.cpg,
   "com.lihaoyi"      %% "requests"          % Versions.requests,
   "com.lihaoyi"      %% "upickle"           % Versions.upickle,
-  "com.github.scopt" %% "scopt"             % Versions.scopt,
+  "com.github.scopt" %% "scopt"              % Versions.scopt,
   "org.reflections"   % "reflections"       % Versions.reflection,
   "org.scalatest"    %% "scalatest"         % Versions.scalatest % Test
 )
 
-Test / compile := (Test / compile).dependsOn((Projects.c2cpg / stage), (Projects.jssrc2cpg / stage)).value
+//dependencyOverrides += "io.shiftleft" %% "codepropertygraph" % Versions.cpg // "1.7.46+0-d0a627a4+20250914-1438"
+
+Test / compile := (Test / compile).dependsOn((Projects.c2cpg / stage), (Projects.superC2cpg / stage), (Projects.jssrc2cpg / stage)).value
 Test / fork    := false
 
 enablePlugins(JavaAppPackaging, UniversalPlugin)
@@ -47,9 +49,11 @@ lazy val rubysrc2cpg   = project.in(file("frontends/rubysrc2cpg"))
 lazy val gosrc2cpg     = project.in(file("frontends/gosrc2cpg"))
 lazy val csharpsrc2cpg = project.in(file("frontends/csharpsrc2cpg"))
 
+
 Universal / mappings ++= frontendMappings("kotlin2cpg", (kotlin2cpg / stage).value)
 Universal / mappings ++= frontendMappings("javasrc2cpg", (javasrc2cpg / stage).value)
 Universal / mappings ++= frontendMappings("c2cpg", (Projects.c2cpg / stage).value)
+Universal / mappings ++= frontendMappings("superC2cpg", (Projects.superC2cpg / stage).value)
 Universal / mappings ++= frontendMappings("ghidra2cpg", (Projects.ghidra2cpg / stage).value)
 Universal / mappings ++= frontendMappings("jssrc2cpg", (jssrc2cpg / stage).value)
 Universal / mappings ++= frontendMappings("swiftsrc2cpg", (swiftsrc2cpg / stage).value)

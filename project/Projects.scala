@@ -13,6 +13,7 @@ object Projects {
 
 
   lazy val c2cpg         = project.in(frontendsRoot / "c2cpg")
+  lazy val superC2cpg    = project.in(frontendsRoot / "superC2cpg")
   lazy val ghidra2cpg    = project.in(frontendsRoot / "ghidra2cpg")
   lazy val x2cpg         = project.in(frontendsRoot / "x2cpg")
   lazy val pysrc2cpg     = project.in(frontendsRoot / "pysrc2cpg")

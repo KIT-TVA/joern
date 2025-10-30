@@ -62,7 +62,10 @@ class TrivialCpgTest extends C2CpgSuite {
     """
 
                   int main(char a, int b) {
-    printf("1");
+    #ifdef macro
+    printf("Hello macro!");
+    #endif
+    printf("1%d",a);
             if (a > 9){
       printf("9");
     }
@@ -78,9 +81,9 @@ class TrivialCpgTest extends C2CpgSuite {
   var globalSuperC: CGlobal = new CGlobal()
   val vAstCreator = VAstCreator("test.c", globalSuperC, superCParseResult)
   val diffGraph = vAstCreator.createAst()
-  val superCpg = newEmptyCpg(None)
+  var superCpg = newEmptyCpg(None)
   flatgraph.DiffGraphApplier.applyDiff(superCpg.graph, diffGraph)
-
+  X2Cpg.applyDefaultOverlays(superCpg)
 
   // Get dot representation
   val astDotGenerator = DotCpg14Generator

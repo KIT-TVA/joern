@@ -11,6 +11,7 @@ lazy val dataflowengineoss = Projects.dataflowengineoss
 lazy val macros            = Projects.macros
 lazy val semanticcpg       = Projects.semanticcpg
 lazy val c2cpg             = Projects.c2cpg
+lazy val superC2cpg         = Projects.superC2cpg
 lazy val ghidra2cpg        = Projects.ghidra2cpg
 lazy val x2cpg             = Projects.x2cpg
 lazy val pysrc2cpg         = Projects.pysrc2cpg
@@ -35,6 +36,7 @@ lazy val root = project.in(file(".")).aggregate(
   macros,
   semanticcpg,
   c2cpg,
+  superC2cpg,
   ghidra2cpg,
   x2cpg,
   pysrc2cpg,

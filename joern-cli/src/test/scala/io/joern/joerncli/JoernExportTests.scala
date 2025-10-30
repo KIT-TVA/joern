@@ -7,6 +7,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import collection.mutable
 
+
 import java.nio.file.Paths
 
 class JoernExportTests extends AnyWordSpec with Matchers with AbstractJoernCliTest {

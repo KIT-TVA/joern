@@ -1,6 +1,6 @@
 /* reads version declarations from /build.sbt so that we can declare them in one place */
 object Versions {
-  val cpg = parseVersion("cpgVersion")
+  val cpg = "1.7.46+0-d0a627a4+20251006-1732" //"1.7.46+0-d0a627a4+20250914-1438"
   // Dont upgrade antlr to 4.10 or above since those versions require java 11 or higher which
   // causes problems upstreams.
   val antlr                  = "4.7.2"

@@ -7,6 +7,7 @@ import io.shiftleft.codepropertygraph.generated.nodes.*
 import org.slf4j.{Logger, LoggerFactory}
 import superc.core.PresenceConditionManager
 import superc.core.PresenceConditionManager.PresenceCondition
+import superc.core.Syntax.Text
 import xtc.tree.{GNode, Location, Node}
 
 import scala.collection.mutable.ListBuffer
@@ -98,10 +99,12 @@ class VAstCreator(
       case compoundStatement: GNode if compoundStatement.hasName("CompoundStatement") =>
         astForBlockStatement(compoundStatement, blockNode(compoundStatement))
       case funcDef: GNode if funcDef.hasName("FunctionDefinition") => astForFunctionDefinition(funcDef)
-      case text: GNode if text.hasName("superc.core.Syntax$Text") => astForLiteral(text)
+      case text: Text[_] if text.hasName("superc.core.Syntax$Text") => astForLiteral(text)
       case identifier: GNode if identifier.hasName("PrimaryIdentifier") => astForIdentifier(identifier)
+      case stringLiteralList: GNode if stringLiteralList.hasName("StringLiteralList") =>
+        astForStringLiteralList(stringLiteralList)
       case relExpression: GNode if relExpression.hasName("RelationalExpression") => astForRelationalExpression(relExpression)
-//      case operator: GNode if operator.hasName("superc.core.Syntax$Language") => astForOperator(operator)
+      //      case operator: GNode if operator.hasName("superc.core.Syntax$Language") => astForOperator(operator)
       case selectionStatement: GNode if selectionStatement.hasName("SelectionStatement") =>
         selectionStatement.getNode(0).toString match {
           case "if" => astForIf(selectionStatement)
@@ -129,9 +132,29 @@ class VAstCreator(
     //TODO registerType?       callNode(relExp, code(relExp), op, op, DispatchTypes.STATIC_DISPATCH, None, Some(registerType(Defines.Any)))
     val callNode_ =
       callNode(relExp, code(relExp), op, op, DispatchTypes.STATIC_DISPATCH, None, Some(Defines.Any))
-    val left  = convertXTCNodeToJoern(relExp.getNode(0))
+    val left = convertXTCNodeToJoern(relExp.getNode(0))
     val right = convertXTCNodeToJoern(relExp.getNode(2))
     callAst(callNode_, List(left, right))
+  }
+
+  private def astForStringLiteralList(stringLitList: Node): Ast = {
+    if (stringLitList.size == 1) {
+      convertXTCNodeToJoern(stringLitList.getNode(0))
+    }
+    else {
+      val literals = getChildren(stringLitList).map(convertXTCNodeToJoern)
+     Ast()
+      /* Ast(
+        nodes = Seq(choiceNode) ++ leftAst.nodes ++ rightAst.nodes,
+        edges = leftAst.edges ++ rightAst.edges,
+        conditionEdges = leftAst.conditionEdges ++ rightAst.conditionEdges ++ presenceConditionEdges,
+        argEdges = leftAst.argEdges ++ rightAst.argEdges,
+        receiverEdges = leftAst.receiverEdges ++ rightAst.receiverEdges,
+        refEdges = leftAst.refEdges ++ rightAst.refEdges,
+        bindsEdges = leftAst.bindsEdges ++ rightAst.bindsEdges,
+        captureEdges = leftAst.captureEdges ++ rightAst.captureEdges
+      )*/
+    }
   }
 
   // CompoundStatement(LocalLabelDeclarationListOpt(), DeclarationOrStatementList(...))
@@ -274,16 +297,14 @@ class VAstCreator(
           case _ => None
         }
       }
-    }.collect { case Some(code): Some[String] => code + " "}.mkString
+    }.collect { case Some(code): Some[String] => code + " " }.mkString
     //TODO: Decide wether we need this implementation, since it has pretty bad performance
   }
 
 
-
-
-  private def astForLiteral(literal: Node): Ast = {
+  private def astForLiteral(literal: Text[?]): Ast = {
     val codeString = code(literal)
-    val tpe = literal.getName //TODO: registerType(safeGetType(lit.getExpressionType))
+    val tpe = literal.tag.toString //TODO: registerType(safeGetType(lit.getExpressionType)) todo:token
     if (codeString == Defines.This) {
       val thisIdentifier = identifierNode(literal, codeString, codeString, tpe)
       // TODO: scope.addVariableReference(codeString, thisIdentifier, tpe, EvaluationStrategies.BY_SHARING)
@@ -300,7 +321,11 @@ class VAstCreator(
     val dispatchType = DispatchTypes.STATIC_DISPATCH
     val callCpgNode =
       callNode(expressionStatement, code(expressionStatement), name, name, dispatchType, Some(""), Some("registerType(callTypeFullName)"))
-    val args = getChildren(expressionStatement.getNode(0).getNode(1)).map(convertXTCNodeToJoern)
+    //TODO: Hier ist das Problem, dass die StringLiteralList nochmal potenziell in einem conditional ist, das heißt wir sollten die convert Funktion allgemein verändern!
+    val args: Seq[Ast] = getChildren(expressionStatement.getNode(0).getNode(1)).flatMap {
+      case stringLiteralList: Node if stringLiteralList.hasName("StringLiteralList") => getChildren(stringLiteralList).map(convertXTCNodeToJoern)
+      case node: Node => Seq(convertXTCNodeToJoern(node))
+    } //.map(convertXTCNodeToJoern)
     createCallAst(callCpgNode, args)
   }
 
@@ -374,14 +399,14 @@ class VAstCreator(
 
       Ast.neighbourValidation(choiceNode, leftAst.root.get, EdgeTypes.AST)
       var presenceConditionEdges = Seq(AstEdge(choiceNode, leftAst.root.get))
-      if (leftAst != Ast()) {
-        Ast.neighbourValidation(choiceNode, rightAst.root.get, EdgeTypes.AST)
+      if (rightAst != Ast()) {
+       //TODO wieder rein kommentiewren: Ast.neighbourValidation(choiceNode, rightAst.root.get, EdgeTypes.AST)
         presenceConditionEdges = presenceConditionEdges :+ AstEdge(choiceNode, rightAst.root.get)
       }
       //TODO: add presenceCondition property!
       Ast(
         nodes = Seq(choiceNode) ++ leftAst.nodes ++ rightAst.nodes,
-        edges = leftAst.edges ++ rightAst.edges,
+        edges = leftAst.edges ++ rightAst.edges ++ presenceConditionEdges,
         conditionEdges = leftAst.conditionEdges ++ rightAst.conditionEdges ++ presenceConditionEdges,
         argEdges = leftAst.argEdges ++ rightAst.argEdges,
         receiverEdges = leftAst.receiverEdges ++ rightAst.receiverEdges,

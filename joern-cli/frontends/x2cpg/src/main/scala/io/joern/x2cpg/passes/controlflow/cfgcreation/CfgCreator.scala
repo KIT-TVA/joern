@@ -152,6 +152,8 @@ class CfgCreator(entryNode: Method, diffGraph: DiffGraphBuilder) {
     */
   protected def cfgForControlStructure(node: ControlStructure): Cfg =
     node.controlStructureType match {
+      case ControlStructureTypes.CHOICE =>
+        cfgForChoiceStatement(node)
       case ControlStructureTypes.BREAK =>
         cfgForBreakStatement(node)
       case ControlStructureTypes.CONTINUE =>
@@ -462,6 +464,48 @@ class CfgCreator(entryNode: Method, diffGraph: DiffGraphBuilder) {
     val bodyCfg      = node.whenTrue.headOption.map(cfgFor).getOrElse(Cfg.empty)
 
     cfgForSwitchLike(conditionCfg, bodyCfg :: Nil)
+  }
+
+  /** CFG creation for if statements of the form `if(condition) body`, optionally followed by `else body2`.
+   */
+  protected def cfgForChoiceStatement(node: ControlStructure): Cfg = {
+    val choiceNodeCfg = cfgForSingleNode(node)
+    
+    val trueCfg = node.whenTrue.headOption.map(cfgFor).getOrElse(Cfg.empty)
+    val falseCfg = node.whenFalse.headOption.map(cfgFor).getOrElse(Cfg.empty)
+    val diffGraphs = edgesFromFringeTo(choiceNodeCfg, trueCfg.entryNode) ++
+      edgesFromFringeTo(choiceNodeCfg, falseCfg.entryNode)
+
+    val ifStatementFringe =
+      if (trueCfg.entryNode.isEmpty && falseCfg.entryNode.isEmpty) {
+        choiceNodeCfg.fringe.withEdgeType(AlwaysEdge)
+      } else {
+        val trueFringe = if (trueCfg.entryNode.isDefined) {
+          trueCfg.fringe
+        }
+        /*else {
+          conditionCfg.fringe.withEdgeType(TrueEdge)
+        }*/
+
+        val falseFringe =
+          if (falseCfg.entryNode.isDefined) {
+            falseCfg.fringe
+          }
+          /*else {
+            conditionCfg.fringe.withEdgeType(FalseEdge)
+          }*/
+
+//        trueFringe ++ falseFringe
+        falseCfg.fringe ++ trueCfg.fringe
+      }
+
+    Cfg
+      .from(choiceNodeCfg, trueCfg, falseCfg)
+      .copy(
+        entryNode = choiceNodeCfg.entryNode,
+        edges = diffGraphs ++ choiceNodeCfg.edges ++ trueCfg.edges ++ falseCfg.edges,
+        fringe = ifStatementFringe
+      )
   }
 
   /** CFG creation for if statements of the form `if(condition) body`, optionally followed by `else body2`.
