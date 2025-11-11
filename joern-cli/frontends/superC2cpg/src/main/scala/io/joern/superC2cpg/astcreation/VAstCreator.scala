@@ -1,4 +1,4 @@
-package io.joern.c2cpg.astcreation
+package io.joern.superC2cpg.astcreation
 
 import io.joern.x2cpg.datastructures.VariableScopeManager
 import io.joern.x2cpg.{Ast, AstCreatorBase, AstEdge, ValidationMode}
@@ -79,7 +79,6 @@ class VAstCreator(
     // val test = astForIf(superCAst.getNode(0).getNode(0).getNode(1).getNode(1).getNode(1).getNode(0).getNode(1))
     val ast = Ast(fileNode).withChild(astForXtcNode(superCAst))
     Ast.storeInDiffGraph(ast, diffGraph)
-//    diffGraph.addEdge()
     scope.createVariableReferenceLinks(diffGraph, filename)
     diffGraph
   }
