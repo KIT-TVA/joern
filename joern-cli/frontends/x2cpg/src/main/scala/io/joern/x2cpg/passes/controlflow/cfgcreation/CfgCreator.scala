@@ -5,6 +5,7 @@ import io.shiftleft.codepropertygraph.generated.nodes.*
 import io.shiftleft.codepropertygraph.generated.{ControlStructureTypes, DispatchTypes, EdgeTypes, Operators}
 import io.shiftleft.semanticcpg.language.*
 import io.shiftleft.codepropertygraph.generated.DiffGraphBuilder
+import io.shiftleft.semanticcpg.language.types.expressions.ControlStructureTraversal.thirdChildIndex
 
 /** Translation of abstract syntax trees into control flow graphs
   *
@@ -470,42 +471,34 @@ class CfgCreator(entryNode: Method, diffGraph: DiffGraphBuilder) {
    */
   protected def cfgForChoiceStatement(node: ControlStructure): Cfg = {
     val choiceNodeCfg = cfgForSingleNode(node)
-    
-    val trueCfg = node.whenTrue.headOption.map(cfgFor).getOrElse(Cfg.empty)
-    val falseCfg = node.whenFalse.headOption.map(cfgFor).getOrElse(Cfg.empty)
-    val diffGraphs = edgesFromFringeTo(choiceNodeCfg, trueCfg.entryNode) ++
-      edgesFromFringeTo(choiceNodeCfg, falseCfg.entryNode)
+//    val choiceNodeCfg = cfgForSingleNode(node.asInstanceOf[CfgNode])
+    choiceNodeCfg
+//    val leftCfg = node.traversal.out.collectAll[AstNode].order(1).headOption.map(cfgFor).getOrElse(Cfg.empty)
+//    leftCfg
+    /*val leftCfg = node.traversal.out.collectAll[AstNode].order(1).headOption.map(cfgFor).getOrElse(Cfg.empty)
+    val rightCfg = node.traversal.out.collectAll[AstNode].order(2).headOption.map(cfgFor).getOrElse(Cfg.empty)
+    var diffGraphs = List(): List[CfgEdge]
+    if(choiceNodeCfg.entryNode.nonEmpty && leftCfg.entryNode.nonEmpty){
+      diffGraphs = List(CfgEdge(choiceNodeCfg.entryNode.get, leftCfg.entryNode.get, AlwaysEdge))
+    }
 
-    val ifStatementFringe =
-      if (trueCfg.entryNode.isEmpty && falseCfg.entryNode.isEmpty) {
+    // edgesFromFringeTo(choiceNodeCfg, choiceNodeCfg.entryNode, AlwaysEdge)//edgesFromFringeTo(List((choiceNodeCfg, AlwaysEdge)))
+
+    val choiceStatementFringe =
+      if (leftCfg.entryNode.isEmpty && rightCfg.entryNode.isEmpty) {
         choiceNodeCfg.fringe.withEdgeType(AlwaysEdge)
       } else {
-        val trueFringe = if (trueCfg.entryNode.isDefined) {
-          trueCfg.fringe
-        }
-        /*else {
-          conditionCfg.fringe.withEdgeType(TrueEdge)
-        }*/
-
-        val falseFringe =
-          if (falseCfg.entryNode.isDefined) {
-            falseCfg.fringe
-          }
-          /*else {
-            conditionCfg.fringe.withEdgeType(FalseEdge)
-          }*/
-
-//        trueFringe ++ falseFringe
-        falseCfg.fringe ++ trueCfg.fringe
+        leftCfg.fringe ++ rightCfg.fringe
       }
-
     Cfg
-      .from(choiceNodeCfg, trueCfg, falseCfg)
+      .from(choiceNodeCfg, leftCfg, rightCfg)
       .copy(
         entryNode = choiceNodeCfg.entryNode,
-        edges = diffGraphs ++ choiceNodeCfg.edges ++ trueCfg.edges ++ falseCfg.edges,
-        fringe = ifStatementFringe
-      )
+        edges = diffGraphs ++ choiceNodeCfg.edges ++ leftCfg.edges ++ rightCfg.edges,
+        fringe = choiceStatementFringe
+      )*/
+
+
   }
 
   /** CFG creation for if statements of the form `if(condition) body`, optionally followed by `else body2`.
