@@ -5,12 +5,13 @@ import io.joern.c2cpg.astcreation.Defines
 import io.joern.x2cpg.passes.frontend.MetaDataPass
 import io.joern.x2cpg.{Ast, AstNodeBuilder, ValidationMode}
 import io.shiftleft.codepropertygraph.generated.nodes.*
-import io.shiftleft.codepropertygraph.generated.{Cpg, EdgeTypes, NodeTypes}
+import io.shiftleft.codepropertygraph.generated.{Cpg, EdgeTypes, NodeTypes, PropertyNames}
 import io.shiftleft.passes.CpgPass
 import io.shiftleft.semanticcpg.language.*
 import io.shiftleft.semanticcpg.language.types.structure.NamespaceTraversal
+import superc.core.PresenceConditionManager.PresenceCondition
 
-class PresenceConditionPass(cpg: Cpg) extends CpgPass(cpg) {
+class PresenceConditionPass(cpg: Cpg, presenceConditionMap: Map[String, PresenceCondition]) extends CpgPass(cpg) {
 
   private val filename: String                          = "<includes>"
   private val globalName: String                        = NamespaceTraversal.globalNamespaceName
@@ -21,9 +22,12 @@ class PresenceConditionPass(cpg: Cpg) extends CpgPass(cpg) {
   override def run(dstGraph: DiffGraphBuilder): Unit = {
     // TODO: Hier dann property hinzufügen?
 //      dstGraph.addEdge()
-    cpg.graph.allEdges
+    val controlStructures :List[ControlStructure] = cpg.graph.allNodes.toList.collect {   case cs: ControlStructure => cs }
+    val bla = controlStructures.map(_.argumentName)
+    controlStructures.foreach{cs =>
+      dstGraph.setNodeProperty(cs, PropertyNames.PresenceCondition, presenceConditionMap.get(cs.argumentName.get).toString)}
 //    dstGraph.
-    dstGraph.setEdgeProperty(cpg.graph.allEdges.head, "test")
+//    dstGraph.setEdgeProperty(cpg.graph.allEdges.head, "test")
    /* var hadMissingTypeDecl = false
     cpg.typ.filter(typeNeedsTypeDeclStub).foreach { t =>
       val newTypeDecl = NewTypeDecl()

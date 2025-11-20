@@ -21,6 +21,7 @@ import io.joern.x2cpg.passes.frontend.MetaDataPass
 import io.shiftleft.codepropertygraph.generated.{Cpg, DiffGraphBuilder, Languages, nodes}
 import io.shiftleft.codepropertygraph.generated.nodes.*
 import superc.SuperC
+import superc.core.PresenceConditionManager
 
 import scala.collection.mutable.ListBuffer
 import scala.jdk.CollectionConverters.IteratorHasAsScala
@@ -61,6 +62,22 @@ class TrivialCpgTest extends C2CpgSuite {
                   }
                   """*/
 
+
+/*  val cCode =
+    """
+
+int main(char a, int b) {
+  #ifdef MACRO
+       while (b > 4){
+  #else
+       for (int i = 1; i <= 5; i++) {
+  #endif
+    printf("%i", b);
+    break;
+    }
+  return a;
+}
+"""*/
 
   val cCode =
     """
@@ -122,9 +139,11 @@ int main(char a, int b) {
 
   var globalSuperC: CGlobal = new CGlobal()
   val vAstCreator = VAstCreator("test.c", globalSuperC, superCParseResult)
-  val diffGraph = vAstCreator.createAst()
+  val diffGraph: DiffGraphBuilder = vAstCreator.createAst()
   flatgraph.DiffGraphApplier.applyDiff(superCpg.graph, diffGraph)
-  new PresenceConditionPass(superCpg).createAndApply()
+  val presenceConditionMap: Map[String, PresenceConditionManager.PresenceCondition] = vAstCreator.getPresenceConditionMap
+  new PresenceConditionPass(superCpg, presenceConditionMap).createAndApply()
+  superCpg.graph.allNodes.toList(3).asInstanceOf[ControlStructure].properties
   X2Cpg.applyDefaultOverlays(superCpg)
 
   // Get dot representation

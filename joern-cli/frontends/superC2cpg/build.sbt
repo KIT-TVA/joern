@@ -1,3 +1,4 @@
+/*
 name := "superC2cpg"
 
 dependsOn(
@@ -47,3 +48,4 @@ enablePlugins(JavaAppPackaging, LauncherJarPlugin)
 
 Universal / packageName       := name.value
 Universal / topLevelDirectory := None
+*/

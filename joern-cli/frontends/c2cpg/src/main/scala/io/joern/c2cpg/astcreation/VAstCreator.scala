@@ -24,7 +24,8 @@ class VAstCreator(
   protected implicit val schemaValidation: ValidationMode = ValidationMode.Disabled
   protected val scope: VariableScopeManager = new CVariableScopeManager()
   protected val logger: Logger = LoggerFactory.getLogger(classOf[VAstCreator])
-
+  protected var choiceNodeIdCounter: Int = 0
+  protected var presenceConditions: Map[String, PresenceCondition] = Map()
 
   private val OperatorMap: Map[String, String] = Map(
 
@@ -318,6 +319,7 @@ class VAstCreator(
   //TODO: check astForCCallExpression for pointerCallAst!
   private def astForFunctionCall(expressionStatement: Node): Ast = {
     val name = expressionStatement.getNode(0).getNode(0).toString
+    
     //TODO: ist das richtig?
     val dispatchType = DispatchTypes.STATIC_DISPATCH
     val callCpgNode =
@@ -369,6 +371,10 @@ class VAstCreator(
       modifiers = List()
     )
   }
+  
+  def getPresenceConditionMap: Map[String, PresenceCondition] = {
+    presenceConditions
+  }
 
   private def astForIf(ifStmt: Node): Ast = {
     val ifNode = controlStructureNode(ifStmt, ControlStructureTypes.IF, code(ifStmt))
@@ -390,11 +396,31 @@ class VAstCreator(
     }
     else {
       val choiceNode = controlStructureNode(conditional, ControlStructureTypes.CHOICE, code(conditional))
-
+/*      choiceNode.code
+      val node_ = NewControlStructure()
+        .parserTypeName(conditional.getClass.getSimpleName)
+        .controlStructureType(ControlStructureTypes.CHOICE)
+        .code(code(conditional))
+        .lineNumber(line(conditional))
+        .columnNumber(column(conditional))
+      offset(conditional).foreach { case (offset, offsetEnd) =>
+        node_.offset(offset).offsetEnd(offsetEnd)
+      }*/
+      val choiceNodeId = choiceNodeIdCounter.toString
+      choiceNodeIdCounter += 1
+      choiceNode.argumentName(choiceNodeId)
+      choiceNode.properties
+      choiceNode.presenceCondition(presenceCondition.toString)
+      presenceConditions = presenceConditions + (choiceNodeId -> presenceCondition)
+      //Entweder argumentname verwenden und gut is oder colum + line  maybe code?
       val leftAst = convertXTCNodeToJoern(conditional.getNode(1))
       var rightAst = Ast()
+      var negatedPresenceCondition: Option[PresenceCondition] = None
       if (conditional.size() == 4) {
         rightAst = convertXTCNodeToJoern(conditional.getNode(3))
+        /*negatedPresenceCondition = conditional.get(2) match {
+          case pc: PresenceCondition => Some(pc)
+        }*/
       }
 
 

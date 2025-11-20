@@ -1,10 +1,8 @@
 package io.joern.x2cpg
 
 import flatgraph.SchemaViolationException
-import io.shiftleft.codepropertygraph.generated.DiffGraphBuilder
-import io.shiftleft.codepropertygraph.generated.EdgeTypes
+import io.shiftleft.codepropertygraph.generated.{DiffGraphBuilder, EdgeTypes, PropertyDefaults, PropertyNames}
 import io.shiftleft.codepropertygraph.generated.nodes.*
-import io.shiftleft.codepropertygraph.generated.PropertyDefaults
 
 case class AstEdge(src: NewNode, dst: NewNode)
 
@@ -25,6 +23,7 @@ object Ast {
 
     ast.nodes.foreach { node =>
       diffGraph.addNode(node)
+//      diffGraph.setNodeProperty(node, PropertyNames.PresenceCondition, "afka")
     }
     ast.edges.foreach { edge =>
       diffGraph.addEdge(edge.src, edge.dst, EdgeTypes.AST)

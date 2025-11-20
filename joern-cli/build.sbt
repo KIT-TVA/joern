@@ -19,7 +19,8 @@ libraryDependencies ++= Seq(
 
 //dependencyOverrides += "io.shiftleft" %% "codepropertygraph" % Versions.cpg // "1.7.46+0-d0a627a4+20250914-1438"
 
-Test / compile := (Test / compile).dependsOn((Projects.c2cpg / stage), (Projects.superC2cpg / stage), (Projects.jssrc2cpg / stage)).value
+Test / compile := (Test / compile).dependsOn((Projects.c2cpg / stage), (Projects.jssrc2cpg / stage)).value
+//Test / compile := (Test / compile).dependsOn((Projects.c2cpg / stage), (Projects.superC2cpg / stage), (Projects.jssrc2cpg / stage)).value
 Test / fork    := false
 
 enablePlugins(JavaAppPackaging, UniversalPlugin)
@@ -53,7 +54,7 @@ lazy val csharpsrc2cpg = project.in(file("frontends/csharpsrc2cpg"))
 Universal / mappings ++= frontendMappings("kotlin2cpg", (kotlin2cpg / stage).value)
 Universal / mappings ++= frontendMappings("javasrc2cpg", (javasrc2cpg / stage).value)
 Universal / mappings ++= frontendMappings("c2cpg", (Projects.c2cpg / stage).value)
-Universal / mappings ++= frontendMappings("superC2cpg", (Projects.superC2cpg / stage).value)
+//Universal / mappings ++= frontendMappings("superC2cpg", (Projects.superC2cpg / stage).value)
 Universal / mappings ++= frontendMappings("ghidra2cpg", (Projects.ghidra2cpg / stage).value)
 Universal / mappings ++= frontendMappings("jssrc2cpg", (jssrc2cpg / stage).value)
 Universal / mappings ++= frontendMappings("swiftsrc2cpg", (swiftsrc2cpg / stage).value)
