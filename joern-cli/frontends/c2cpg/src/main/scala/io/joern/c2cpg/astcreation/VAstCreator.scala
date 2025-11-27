@@ -372,95 +372,9 @@ class VAstCreator(
         } //.map(convertXTCNodeToJoern)
         createCallAst(callCpgNode, args)
 
-        /*def moveChoiceNodeUp(node: Node): Node = {
-          node match {
-            case choiceNode: GNode if choiceNode.hasName("Conditional") => choiceNode
-            case _ => node
-          }
 
-          /*def createCallAstForName(name: String): Ast = {
-            val dispatchType = DispatchTypes.STATIC_DISPATCH
-            val callCpgNode =
-              callNode(expressionStatement, code(expressionStatement), name, name, dispatchType, Some(""), Some("registerType(callTypeFullName)"))
-            //TODO: Hier ist das Problem, dass die StringLiteralList nochmal potenziell in einem conditional ist, das heißt wir sollten die convert Funktion allgemein verändern!
-            val args: Seq[Ast] = getChildren(expressionStatement.getNode(0).getNode(1)).flatMap {
-              case stringLiteralList: Node if stringLiteralList.hasName("StringLiteralList") => getChildren(stringLiteralList).map(convertXTCNodeToJoern)
-              case node: Node => Seq(convertXTCNodeToJoern(node))
-            } //.map(convertXTCNodeToJoern)
-            createCallAst(callCpgNode, args)
-          }
-
-          if (isChoiceNode(expressionStatement.getNode(0).getNode(0))) {
-            moveChoiceNodeUp(expressionStatement.getNode(0).getNode(0))
-          }
-          else {
-            createCallAstForName(expressionStatement.getNode(0).getNode(0).toString)
-          }
-
-
-          def bla(nameNode: Node): Ast = {
-            nameNode match {
-              case choiceNode: GNode if choiceNode.hasName("Conditional") =>
-                val nameChoiceAst = astForChoiceNode(nameNode)
-                val childAsts = getChildren(choiceNode).map(bla)
-                val choiceEdges = childAsts.map(childAst => AstEdge(nameChoiceAst.root.get, childAst.root.get))
-                Ast(
-                  nodes = Seq(nameChoiceAst.root.get) ++ childAsts.flatMap(_.nodes),
-                  edges = choiceEdges ++ childAsts.flatMap(_.edges),
-                  conditionEdges = childAsts.flatMap(_.conditionEdges),
-                  argEdges = childAsts.flatMap(_.argEdges),
-                  receiverEdges = childAsts.flatMap(_.receiverEdges),
-                  refEdges = childAsts.flatMap(_.refEdges),
-                  bindsEdges = childAsts.flatMap(_.bindsEdges),
-                  captureEdges = childAsts.flatMap(_.captureEdges)
-                )
-              case literal: GNode => createCallAstForName(literal.toString)
-            }
-          }
-
-          bla(expressionStatement.getNode(0).getNode(0))*/
-        }*/
     }
   }
-
-
-  /*private def astForFunctionCall(expressionStatement: Node): Ast = {
-
-    def createCallAstForName(name: String): Ast = {
-      val dispatchType = DispatchTypes.STATIC_DISPATCH
-      val callCpgNode =
-        callNode(expressionStatement, code(expressionStatement), name, name, dispatchType, Some(""), Some("registerType(callTypeFullName)"))
-      //TODO: Hier ist das Problem, dass die StringLiteralList nochmal potenziell in einem conditional ist, das heißt wir sollten die convert Funktion allgemein verändern!
-      val args: Seq[Ast] = getChildren(expressionStatement.getNode(0).getNode(1)).flatMap {
-        case stringLiteralList: Node if stringLiteralList.hasName("StringLiteralList") => getChildren(stringLiteralList).map(convertXTCNodeToJoern)
-        case node: Node => Seq(convertXTCNodeToJoern(node))
-      } //.map(convertXTCNodeToJoern)
-      createCallAst(callCpgNode, args)
-    }
-
-    def bla(nameNode: Node): Ast = {
-      nameNode match {
-        case choiceNode: GNode if choiceNode.hasName("Conditional") =>
-          val nameChoiceAst = astForChoiceNode(nameNode)
-          val childAsts = getChildren(choiceNode).map(bla)
-          val choiceEdges = childAsts.map(childAst => AstEdge(nameChoiceAst.root.get, childAst.root.get))
-          Ast(
-            nodes = Seq(nameChoiceAst.root.get) ++ childAsts.flatMap(_.nodes),
-            edges = choiceEdges ++ childAsts.flatMap(_.edges),
-            conditionEdges = childAsts.flatMap(_.conditionEdges),
-            argEdges = childAsts.flatMap(_.argEdges),
-            receiverEdges = childAsts.flatMap(_.receiverEdges),
-            refEdges = childAsts.flatMap(_.refEdges),
-            bindsEdges = childAsts.flatMap(_.bindsEdges),
-            captureEdges = childAsts.flatMap(_.captureEdges)
-          )
-        case literal: GNode => createCallAstForName(literal.toString)
-      }
-    }
-
-    bla(expressionStatement.getNode(0).getNode(0))
-  }*/
-
 
   private def astForFunctionDefinition(funcDef: Node): Ast = {
     val filename = getLocations(collectAllNodes(funcDef)) match {
