@@ -1,5 +1,7 @@
 package io.joern.c2cpg.astcreation
 
+import com.rits.cloning.Cloner
+import io.circe.syntax.*
 import io.joern.x2cpg.datastructures.VariableScopeManager
 import io.joern.x2cpg.{Ast, AstCreatorBase, AstEdge, ValidationMode}
 import io.shiftleft.codepropertygraph.generated.*
@@ -8,7 +10,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import superc.core.PresenceConditionManager
 import superc.core.PresenceConditionManager.PresenceCondition
 import superc.core.Syntax.Text
-import xtc.tree.{GNode, Location, Node}
+import xtc.tree.{GNode, Location, Node, Token}
 
 import scala.collection.mutable.ListBuffer
 
@@ -80,7 +82,7 @@ class VAstCreator(
     // val test = astForIf(superCAst.getNode(0).getNode(0).getNode(1).getNode(1).getNode(1).getNode(0).getNode(1))
     val ast = Ast(fileNode).withChild(astForXtcNode(superCAst))
     Ast.storeInDiffGraph(ast, diffGraph)
-//    diffGraph.addEdge()
+    //    diffGraph.addEdge()
     scope.createVariableReferenceLinks(diffGraph, filename)
     diffGraph
   }
@@ -145,7 +147,7 @@ class VAstCreator(
     }
     else {
       val literals = getChildren(stringLitList).map(convertXTCNodeToJoern)
-     Ast()
+      Ast()
       /* Ast(
         nodes = Seq(choiceNode) ++ leftAst.nodes ++ rightAst.nodes,
         edges = leftAst.edges ++ rightAst.edges,
@@ -290,6 +292,16 @@ class VAstCreator(
   }
 
   override protected def code(node: Node): String = {
+
+    if (node.hasName("ExpressionStatement") && node.getNode(0).hasName("FunctionCall")) {
+      val nameNode = node.getNode(0).getNode(0)
+      if (isChoiceNode(nameNode)) {
+        val argNodes = node.getNode(0).getNode(1)
+        val argsCode = code(argNodes)
+        return getChildren(nameNode).map(code(_) + " " + argsCode).mkString(" ")
+      }
+    }
+
     val nodes = collectAllNodes(node)
     nodes.flatMap { n =>
 
@@ -316,21 +328,139 @@ class VAstCreator(
     }
   }
 
+  private def isChoiceNode(node: Node): Boolean = {
+    node match {
+      case choiceNode: GNode if choiceNode.hasName("Conditional") => true
+      case _ => false
+    }
+  }
+
   //TODO: check astForCCallExpression for pointerCallAst!
   private def astForFunctionCall(expressionStatement: Node): Ast = {
-    val name = expressionStatement.getNode(0).getNode(0).toString
-    
-    //TODO: ist das richtig?
-    val dispatchType = DispatchTypes.STATIC_DISPATCH
-    val callCpgNode =
-      callNode(expressionStatement, code(expressionStatement), name, name, dispatchType, Some(""), Some("registerType(callTypeFullName)"))
-    //TODO: Hier ist das Problem, dass die StringLiteralList nochmal potenziell in einem conditional ist, das heißt wir sollten die convert Funktion allgemein verändern!
-    val args: Seq[Ast] = getChildren(expressionStatement.getNode(0).getNode(1)).flatMap {
-      case stringLiteralList: Node if stringLiteralList.hasName("StringLiteralList") => getChildren(stringLiteralList).map(convertXTCNodeToJoern)
-      case node: Node => Seq(convertXTCNodeToJoern(node))
-    } //.map(convertXTCNodeToJoern)
-    createCallAst(callCpgNode, args)
+    val nameNode = expressionStatement.getNode(0).getNode(0)
+    val argNodes = getChildren(expressionStatement.getNode(0).getNode(1))
+    nameNode match {
+      // Joern does not have a specific node for the name of the called function in a function call.
+      // SuperC, however, does and allows for these nodes to be choice nodes. In these cases we thus have to move the
+      // choice node up in the graph and copy the arguments. We do this in SuperC's graph datastructure, because that
+      // is the one used to derive the code for Joern nodes and would otherwise not match.
+      case choiceNode: GNode if choiceNode.hasName("Conditional") => {
+        val leftNameNode = choiceNode.remove(1)
+        expressionStatement.getNode(0).set(0, leftNameNode)
+        choiceNode.add(1, expressionStatement)
+
+        if(choiceNode.size == 4){
+          val cloner = new Cloner()
+          val clonedExpressionStatement = cloner.deepClone(expressionStatement)
+          val rightNameNode = choiceNode.remove(3)
+          clonedExpressionStatement.getNode(0).set(0, rightNameNode)
+          choiceNode.add(3, clonedExpressionStatement)
+
+        }
+        convertXTCNodeToJoern(choiceNode)
+      }
+      // If the name node is not a choice node we can easily translate it.
+      case _ =>
+        val name = nameNode.toString
+        val dispatchType = DispatchTypes.STATIC_DISPATCH
+        val callCpgNode =
+          callNode(expressionStatement, code(expressionStatement), name, name, dispatchType, Some(""), Some("registerType(callTypeFullName)"))
+        //TODO: Hier ist das Problem, dass die StringLiteralList nochmal potenziell in einem conditional ist, das heißt wir sollten die convert Funktion allgemein verändern!
+        val args: Seq[Ast] = getChildren(expressionStatement.getNode(0).getNode(1)).flatMap {
+          case stringLiteralList: Node if stringLiteralList.hasName("StringLiteralList") => getChildren(stringLiteralList).map(convertXTCNodeToJoern)
+          case node: Node => Seq(convertXTCNodeToJoern(node))
+        } //.map(convertXTCNodeToJoern)
+        createCallAst(callCpgNode, args)
+
+        /*def moveChoiceNodeUp(node: Node): Node = {
+          node match {
+            case choiceNode: GNode if choiceNode.hasName("Conditional") => choiceNode
+            case _ => node
+          }
+
+          /*def createCallAstForName(name: String): Ast = {
+            val dispatchType = DispatchTypes.STATIC_DISPATCH
+            val callCpgNode =
+              callNode(expressionStatement, code(expressionStatement), name, name, dispatchType, Some(""), Some("registerType(callTypeFullName)"))
+            //TODO: Hier ist das Problem, dass die StringLiteralList nochmal potenziell in einem conditional ist, das heißt wir sollten die convert Funktion allgemein verändern!
+            val args: Seq[Ast] = getChildren(expressionStatement.getNode(0).getNode(1)).flatMap {
+              case stringLiteralList: Node if stringLiteralList.hasName("StringLiteralList") => getChildren(stringLiteralList).map(convertXTCNodeToJoern)
+              case node: Node => Seq(convertXTCNodeToJoern(node))
+            } //.map(convertXTCNodeToJoern)
+            createCallAst(callCpgNode, args)
+          }
+
+          if (isChoiceNode(expressionStatement.getNode(0).getNode(0))) {
+            moveChoiceNodeUp(expressionStatement.getNode(0).getNode(0))
+          }
+          else {
+            createCallAstForName(expressionStatement.getNode(0).getNode(0).toString)
+          }
+
+
+          def bla(nameNode: Node): Ast = {
+            nameNode match {
+              case choiceNode: GNode if choiceNode.hasName("Conditional") =>
+                val nameChoiceAst = astForChoiceNode(nameNode)
+                val childAsts = getChildren(choiceNode).map(bla)
+                val choiceEdges = childAsts.map(childAst => AstEdge(nameChoiceAst.root.get, childAst.root.get))
+                Ast(
+                  nodes = Seq(nameChoiceAst.root.get) ++ childAsts.flatMap(_.nodes),
+                  edges = choiceEdges ++ childAsts.flatMap(_.edges),
+                  conditionEdges = childAsts.flatMap(_.conditionEdges),
+                  argEdges = childAsts.flatMap(_.argEdges),
+                  receiverEdges = childAsts.flatMap(_.receiverEdges),
+                  refEdges = childAsts.flatMap(_.refEdges),
+                  bindsEdges = childAsts.flatMap(_.bindsEdges),
+                  captureEdges = childAsts.flatMap(_.captureEdges)
+                )
+              case literal: GNode => createCallAstForName(literal.toString)
+            }
+          }
+
+          bla(expressionStatement.getNode(0).getNode(0))*/
+        }*/
+    }
   }
+
+
+  /*private def astForFunctionCall(expressionStatement: Node): Ast = {
+
+    def createCallAstForName(name: String): Ast = {
+      val dispatchType = DispatchTypes.STATIC_DISPATCH
+      val callCpgNode =
+        callNode(expressionStatement, code(expressionStatement), name, name, dispatchType, Some(""), Some("registerType(callTypeFullName)"))
+      //TODO: Hier ist das Problem, dass die StringLiteralList nochmal potenziell in einem conditional ist, das heißt wir sollten die convert Funktion allgemein verändern!
+      val args: Seq[Ast] = getChildren(expressionStatement.getNode(0).getNode(1)).flatMap {
+        case stringLiteralList: Node if stringLiteralList.hasName("StringLiteralList") => getChildren(stringLiteralList).map(convertXTCNodeToJoern)
+        case node: Node => Seq(convertXTCNodeToJoern(node))
+      } //.map(convertXTCNodeToJoern)
+      createCallAst(callCpgNode, args)
+    }
+
+    def bla(nameNode: Node): Ast = {
+      nameNode match {
+        case choiceNode: GNode if choiceNode.hasName("Conditional") =>
+          val nameChoiceAst = astForChoiceNode(nameNode)
+          val childAsts = getChildren(choiceNode).map(bla)
+          val choiceEdges = childAsts.map(childAst => AstEdge(nameChoiceAst.root.get, childAst.root.get))
+          Ast(
+            nodes = Seq(nameChoiceAst.root.get) ++ childAsts.flatMap(_.nodes),
+            edges = choiceEdges ++ childAsts.flatMap(_.edges),
+            conditionEdges = childAsts.flatMap(_.conditionEdges),
+            argEdges = childAsts.flatMap(_.argEdges),
+            receiverEdges = childAsts.flatMap(_.receiverEdges),
+            refEdges = childAsts.flatMap(_.refEdges),
+            bindsEdges = childAsts.flatMap(_.bindsEdges),
+            captureEdges = childAsts.flatMap(_.captureEdges)
+          )
+        case literal: GNode => createCallAstForName(literal.toString)
+      }
+    }
+
+    bla(expressionStatement.getNode(0).getNode(0))
+  }*/
+
 
   private def astForFunctionDefinition(funcDef: Node): Ast = {
     val filename = getLocations(collectAllNodes(funcDef)) match {
@@ -371,7 +501,7 @@ class VAstCreator(
       modifiers = List()
     )
   }
-  
+
   def getPresenceConditionMap: Map[String, PresenceCondition] = {
     presenceConditions
   }
@@ -387,26 +517,48 @@ class VAstCreator(
     controlStructureAst(ifNode, Option(condAst), Seq(thenAst, elseAst))
   }
 
-  private def astForChoiceNode(conditional: Node): Ast = {
-    val presenceCondition: PresenceCondition = conditional.get(0) match {
+  private def astForChoiceNode(choiceStatement: Node): Ast = {
+    val presenceCondition: PresenceCondition = choiceStatement.get(0) match {
       case pc: PresenceCondition => pc
     }
     if (presenceCondition.isTrue) {
-      convertXTCNodeToJoern(conditional.getNode(1))
+      convertXTCNodeToJoern(choiceStatement.getNode(1))
     }
     else {
-      val choiceNode = controlStructureNode(conditional, ControlStructureTypes.CHOICE, code(conditional))
-/*      choiceNode.code
-      val node_ = NewControlStructure()
-        .parserTypeName(conditional.getClass.getSimpleName)
-        .controlStructureType(ControlStructureTypes.CHOICE)
-        .code(code(conditional))
-        .lineNumber(line(conditional))
-        .columnNumber(column(conditional))
-      offset(conditional).foreach { case (offset, offsetEnd) =>
-        node_.offset(offset).offsetEnd(offsetEnd)
-      }*/
-      val choiceNodeId = choiceNodeIdCounter.toString
+      val choiceNode = controlStructureNode(choiceStatement, ControlStructureTypes.CHOICE, code(choiceStatement))
+      val leftAst = convertXTCNodeToJoern(choiceStatement.getNode(1))
+      var rightAst = Ast()
+      //      var presenceConditionMap : Map[Int, PresenceCondition] = Map(leftAst.hashCode() -> presenceCondition)
+      var presenceConditionMap: Map[Int, String] = Map(0 -> presenceCondition.toString)
+
+      var presenceConditionEdges = Seq(AstEdge(choiceNode, leftAst.root.get))
+      if (choiceStatement.size() == 4) {
+        rightAst = convertXTCNodeToJoern(choiceStatement.getNode(3))
+        //TODO wieder rein kommentiewren: Ast.neighbourValidation(choiceNode, rightAst.root.get, EdgeTypes.AST)
+        presenceConditionEdges = presenceConditionEdges :+ AstEdge(choiceNode, rightAst.root.get)
+        val negatedPresenceCondition = choiceStatement.get(2) match {
+          case pc: PresenceCondition => pc
+        }
+        //        presenceConditionMap = presenceConditionMap + (rightAst.hashCode() -> negatedPresenceCondition)
+        presenceConditionMap = presenceConditionMap + (1 -> negatedPresenceCondition.toString)
+      }
+      val presenceConditionMapSerialized = presenceConditionMap.asJson.noSpaces
+      choiceNode.presenceCondition(presenceConditionMapSerialized)
+
+      Ast(
+        nodes = Seq(choiceNode) ++ leftAst.nodes ++ rightAst.nodes,
+        edges = leftAst.edges ++ rightAst.edges ++ presenceConditionEdges,
+        conditionEdges = leftAst.conditionEdges ++ rightAst.conditionEdges ++ Seq(AstEdge(choiceNode, choiceNode)), //TODO: ++ presenceConditionEdges?
+        argEdges = leftAst.argEdges ++ rightAst.argEdges,
+        receiverEdges = leftAst.receiverEdges ++ rightAst.receiverEdges,
+        refEdges = leftAst.refEdges ++ rightAst.refEdges,
+        bindsEdges = leftAst.bindsEdges ++ rightAst.bindsEdges,
+        captureEdges = leftAst.captureEdges ++ rightAst.captureEdges
+      )
+
+      //      controlStructureAst(choiceNode, Option(choiceNode), Seq())
+
+      /*val choiceNodeId = choiceNodeIdCounter.toString
       choiceNodeIdCounter += 1
       choiceNode.argumentName(choiceNodeId)
       choiceNode.properties
@@ -440,9 +592,52 @@ class VAstCreator(
         refEdges = leftAst.refEdges ++ rightAst.refEdges,
         bindsEdges = leftAst.bindsEdges ++ rightAst.bindsEdges,
         captureEdges = leftAst.captureEdges ++ rightAst.captureEdges
-      )
+      )*/
 
     }
 
   }
 }
+
+
+
+
+
+/*
+//This is what intellijs AI suggested, but it is quatsch
+def deepCopyNode(node: Node): Node = {
+  node match {
+    case gnode: GNode =>
+      val copy = GNode.create(gnode.getName)
+      // Kopiere Location falls vorhanden
+      if (node.hasLocation) {
+        copy.setLocation(node.getLocation)
+      }
+      // Kopiere Properties
+      node.properties.forEach { name =>
+        copy.setProperty(name, node.getProperty(name))
+      }
+      // Kopiere alle Kinder rekursiv
+      for (i <- 0 until node.size()) {
+        node.get(i) match {
+          case childNode: Node => copy.add(deepCopyNode(childNode))
+          case other => copy.add(other) // Primitive Werte wie String, Int etc.
+        }
+      }
+      copy
+
+    case token: Token =>
+      // Für Tokens erstellen Sie eine neue Instanz
+      val newToken = new Token(token.getTokenText)
+      if (node.hasLocation) {
+        newToken.setLocation(node.getLocation)
+      }
+      newToken
+
+    case _ =>
+      // Fallback: versuchen Sie eine generische Kopie
+      throw new UnsupportedOperationException(s"Deep copy not supported for node type: ${node.getClass.getName}")
+  }
+}*/
+
+
