@@ -14,7 +14,10 @@ libraryDependencies ++= Seq(
   "org.eclipse.platform"    % "org.eclipse.text"           % Versions.eclipseText,
   // see note in readme re self-publishing cdt-core
   "io.joern"       % "eclipse-cdt-core" % Versions.eclipseCdt,
-  "org.scalatest" %% "scalatest"        % Versions.scalatest % Test
+  "org.scalatest" %% "scalatest"        % Versions.scalatest % Test,
+  "io.circe" %% "circe-generic" % Versions.circle,
+  "io.circe" %% "circe-parser" % Versions.circle,
+  "io.github.kostaskougios" % "cloning" % "1.12.0"
 )
 
 dependencyOverrides ++= Seq(
