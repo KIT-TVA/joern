@@ -79,7 +79,8 @@ int main(char a, int b) {
 }
 """*/
 
-  val cCode =
+/*
+  var cCode =
     """
 
 int main(char a, int b) {
@@ -91,6 +92,70 @@ int main(char a, int b) {
   return a;
 }
 """
+*/
+
+
+/*  cCode =
+    """
+      int main(char a, int b) {
+                           #ifdef MACRO
+                                printf("a");
+                           #else
+                                //a = a + 1;
+                                printf("b");
+                          #endif
+                          return a;
+                        }
+      """
+
+    */
+
+/*cCode =
+  """ int main(int a) {
+    if (a>5){
+    printf("hello");
+    }
+    }""".stripMargin*/
+/*  cCode =
+    """
+
+  int main(char a, int b) {
+    #ifdef MACRO
+         foo
+    #else
+         bar
+    #endif
+    (b);
+    return a;
+  }
+  """*/
+
+/*  cCode =
+    """
+      int main() {
+          int a, x = 5;
+          int b = 0;
+
+      #ifdef MACRO
+          b = 0;
+      #else
+          b = 42;
+      #endif
+
+          return b;
+      }
+      """*/
+
+    val cCode =
+      """
+      int main() {
+          int a[21];
+          int b = 0;
+
+
+          return b;
+      }
+      """
 
 /*
   val cCode =
@@ -142,8 +207,8 @@ int main(char a, int b) {
   val diffGraph: DiffGraphBuilder = vAstCreator.createAst()
   flatgraph.DiffGraphApplier.applyDiff(superCpg.graph, diffGraph)
   val presenceConditionMap: Map[String, PresenceConditionManager.PresenceCondition] = vAstCreator.getPresenceConditionMap
-  new PresenceConditionPass(superCpg, presenceConditionMap).createAndApply()
-  superCpg.graph.allNodes.toList(3).asInstanceOf[ControlStructure].properties
+//  new PresenceConditionPass(superCpg, presenceConditionMap).createAndApply()
+//  superCpg.graph.allNodes.toList(3).asInstanceOf[ControlStructure].properties
   X2Cpg.applyDefaultOverlays(superCpg)
 
   // Get dot representation

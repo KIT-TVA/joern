@@ -100,6 +100,9 @@ class VAstCreator(
   def convertXTCNodeToJoern(node: Node): Ast = {
     node match {
       case conditional: GNode if conditional.hasName("Conditional") => astForChoiceNode(conditional)
+      case declaration: GNode if declaration.hasName("Declaration") => convertXTCNodeToJoern(declaration.getNode(0)) //TODO ?
+      case declarationList: GNode if declarationList.hasName("DeclaringList") => astForDeclarationList(declarationList)
+      case simpleDeclarator: GNode if simpleDeclarator.hasName("SimpleDeclarator") => astForSimpleDeclaration(simpleDeclarator)
       case compoundStatement: GNode if compoundStatement.hasName("CompoundStatement") =>
         astForBlockStatement(compoundStatement, blockNode(compoundStatement))
       case funcDef: GNode if funcDef.hasName("FunctionDefinition") => astForFunctionDefinition(funcDef)
@@ -122,6 +125,97 @@ class VAstCreator(
       case node => Ast() //getChildren(node).map(convertXTCNodeToJoern).head
     }
   }
+
+
+/*  Declaration(
+    DeclaringList(
+    superc.core.Syntax$Language("int"),
+
+      SimpleDeclarator(superc.core.Syntax$Text("b")),
+
+      AssemblyExpressionOpt(),
+
+      AttributeSpecifierListOpt(),
+
+      InitializerOpt(Initializer(superc.core.Syntax$Text("0")))
+    )
+  )
+  */
+
+
+/*  DeclaringList(
+    DeclaringList(superc.core.Syntax$Language("int"),
+
+      SimpleDeclarator(superc.core.Syntax$Text("a")),
+
+      AssemblyExpressionOpt(),
+
+      AttributeSpecifierListOpt(),
+
+      InitializerOpt()
+    ),
+
+    AttributeSpecifierListOpt(),
+
+    SimpleDeclarator(superc.core.Syntax$Text("x")),
+
+    AssemblyExpressionOpt(),
+
+    AttributeSpecifierListOpt(),
+
+    InitializerOpt(Initializer(superc.core.Syntax$Text("5"))))*/
+
+
+  private def astForDeclarationList(declaration: Node): Ast = {
+    // We do not support int x, y = 5;
+    // Todo: typedefs, part of class etc
+    val childNodes = getChildren(declaration)
+
+    val typeNode = childNodes.head
+    val declarator = childNodes(1)
+    val assemblyExpressionOpt = childNodes(2)
+    val attributeSpecifierListOpt = childNodes(3)
+    val InitializerOpt = childNodes(4)
+
+    val node = localNode(declarator, declarator.getName, code(declarator), typeNode.toString)
+
+    val declAst = Ast(node)
+    var initAst = Ast()
+    if(InitializerOpt.size() > 0) {
+      initAst = astForInitializer(declarator, InitializerOpt.getNode(0))
+    }
+
+    initAst
+  }
+
+  private def astForSimpleDeclaration(simpleDeclaration: Node): Ast = {
+    astForIdentifier(simpleDeclaration)
+//    convertXTCNodeToJoern(simpleDeclaration.getNode(0))
+  }
+
+  private def astForInitializer(declarator: Node, init: Node): Ast = {
+    init match {
+      case equalInit: Node if equalInit.hasName("Initializer") =>
+        astForEqualsInitializer(declarator, convertXTCNodeToJoern(declarator), convertXTCNodeToJoern(equalInit.getNode(0)))
+      case _ => Ast()
+    }
+  }
+
+  private def astForEqualsInitializer(declarator: Node, leftAst: Ast, rightAst: Ast): Ast = {
+    val assignmentCallNode = callNode(
+      declarator,
+      code(declarator),
+      Operators.assignment,
+      Operators.assignment,
+      DispatchTypes.STATIC_DISPATCH,
+      None,
+      Some(Defines.Void)
+//      Some(registerType(Defines.Void))
+    )
+    callAst(assignmentCallNode, List(leftAst, rightAst))
+  }
+
+
 
   private def astForIdentifier(identifier: Node): Ast = {
     //TODO: Im Eclipse Frontend wird noch maybeMethodRefForIdentifier verwendet, nachschauen was bei uns das equivalent ist
