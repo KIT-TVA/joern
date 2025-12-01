@@ -473,16 +473,17 @@ class CfgCreator(entryNode: Method, diffGraph: DiffGraphBuilder) {
     val choiceNodeCfg = cfgForSingleNode(node)
 //    val choiceNodeCfg = cfgForSingleNode(node.asInstanceOf[CfgNode])
     choiceNodeCfg
-//    val leftCfg = node.traversal.out.collectAll[AstNode].order(1).headOption.map(cfgFor).getOrElse(Cfg.empty)
-//    leftCfg
-    /*val leftCfg = node.traversal.out.collectAll[AstNode].order(1).headOption.map(cfgFor).getOrElse(Cfg.empty)
+    val leftCfg = node.traversal.out.collectAll[AstNode].order(1).headOption.map(cfgFor).getOrElse(Cfg.empty)
     val rightCfg = node.traversal.out.collectAll[AstNode].order(2).headOption.map(cfgFor).getOrElse(Cfg.empty)
-    var diffGraphs = List(): List[CfgEdge]
-    if(choiceNodeCfg.entryNode.nonEmpty && leftCfg.entryNode.nonEmpty){
-      diffGraphs = List(CfgEdge(choiceNodeCfg.entryNode.get, leftCfg.entryNode.get, AlwaysEdge))
-    }
 
-    // edgesFromFringeTo(choiceNodeCfg, choiceNodeCfg.entryNode, AlwaysEdge)//edgesFromFringeTo(List((choiceNodeCfg, AlwaysEdge)))
+    val diffGraphs = edgesFromFringeTo(choiceNodeCfg, leftCfg.entryNode) ++
+      edgesFromFringeTo(choiceNodeCfg, rightCfg.entryNode)
+
+
+    /*if(cho>FiceNodeCfg.entryNode.nonEmpty && leftCfg.entryNode.nonEmpty){
+      diffGraphs = List(CfgEdge(choiceNodeCfg.entryNode.get, leftCfg.entryNode.get, AlwaysEdge))
+    }*/
+
 
     val choiceStatementFringe =
       if (leftCfg.entryNode.isEmpty && rightCfg.entryNode.isEmpty) {
@@ -496,8 +497,7 @@ class CfgCreator(entryNode: Method, diffGraph: DiffGraphBuilder) {
         entryNode = choiceNodeCfg.entryNode,
         edges = diffGraphs ++ choiceNodeCfg.edges ++ leftCfg.edges ++ rightCfg.edges,
         fringe = choiceStatementFringe
-      )*/
-
+      )
 
   }
 

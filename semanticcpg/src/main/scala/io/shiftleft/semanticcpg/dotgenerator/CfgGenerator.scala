@@ -48,8 +48,13 @@ class CfgGenerator {
     case _              => false
   }
 
+  private def hasPresenceConditionProperty(v: StoredNode): Boolean = { 
+    v.properties.contains("PRESENCE_CONDITION")
+  }
+
   private def cfgNodeShouldBeDisplayed(v: StoredNode): Boolean =
     isConditionInControlStructure(v) ||
+      hasPresenceConditionProperty(v) ||
       !(v.isInstanceOf[Literal] ||
         v.isInstanceOf[Identifier] ||
         v.isInstanceOf[Block] ||
