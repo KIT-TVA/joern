@@ -8,7 +8,7 @@ import scala.collection.mutable
 
 // Fixture class from which all tests which require a code to CPG translation step
 // should either directly or indirectly use. The intended way is to derive from
-// this class, thereby specifying the testCpgFactory parameter and than use the
+// this class, thereby specifying the testCpgFactory parameter and then use the
 // derived class in tests.
 // The testCpgFactory() and code() methods return a type T deriving from TestCpg
 // in order to allow further cpg and language frontend configuration methods to
