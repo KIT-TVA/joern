@@ -4,7 +4,7 @@ import flatgraph.Graph
 import io.joern.c2cpg.astcreation.{AstCreator, CGlobal, VAstCreator}
 import io.joern.c2cpg.passes.PresenceConditionPass
 import io.joern.c2cpg.testfixtures.C2CpgSuite
-import io.joern.dataflowengineoss.dotgenerator.{DotCpg14Generator, DotPdgGenerator}
+import io.joern.dataflowengineoss.dotgenerator.{DotCpg14Generator, DotDdgGenerator, DotPdgGenerator}
 import io.shiftleft.semanticcpg.utils.FileUtil.*
 import io.shiftleft.semanticcpg.utils.FileUtil
 import org.scalatest.matchers.should.Matchers
@@ -146,16 +146,48 @@ int main(char a, int b) {
       }
       """*/
 
-    val cCode =
+    /*val cCode =
       """
       int main() {
-          int a[21];
+          //int a[21];
           int b = 0;
-
+          if(b>3){
+          b = b +5;
+          b = b *1005;
+          }
+          printf("%i", b);
 
           return b;
       }
-      """
+      """*/
+
+
+  /*  val cCode =
+    """
+void foo() {
+    int x = 5;
+    if (x < 5) {
+        int y = 20;
+        #ifdef macro
+            sink(y);
+        #else
+            sink2(y);
+        #endif
+    }
+}"""
+*/
+
+  // Yamaguchi paper
+
+  val cCode =
+    """
+void foo() {
+    int x = 5; 
+    if (x < 5) {
+        int y = 2*x;
+            sink(y);
+    }
+}"""
 
 /*
   val cCode =
@@ -220,10 +252,11 @@ int main(char a, int b) {
 
   val cCpg = code(cCode)
   val cTraversal = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
+  val cAstDotString = DotDdgGenerator.toDotDdg(cTraversal)
 //  val cAstDotString = DotPdgGenerator.toDotPdg(cTraversal)
-  val cAstDotString = DotCpg14Generator.toDotCpg14(cTraversal)
+//  val cAstDotString = DotCpg14Generator.toDotCpg14(cTraversal)
   cCpg.close()
-  
+
   val superCSstring = superCAstDotString.mkString
   val cString = cAstDotString.mkString
 //  println("SuperC:")
