@@ -473,6 +473,7 @@ class CfgCreator(entryNode: Method, diffGraph: DiffGraphBuilder) {
     val choiceNodeCfg = cfgForSingleNode(node)
 //    val choiceNodeCfg = cfgForSingleNode(node.asInstanceOf[CfgNode])
     choiceNodeCfg
+    //TODO: this could be part of the problems:
     val leftCfg = node.traversal.out.collectAll[AstNode].order(1).headOption.map(cfgFor).getOrElse(Cfg.empty)
     val rightCfg = node.traversal.out.collectAll[AstNode].order(2).headOption.map(cfgFor).getOrElse(Cfg.empty)
 

@@ -60,7 +60,7 @@ class DdgGenerator {
   private def shouldBeDisplayed(v: StoredNode): Boolean = !(
     v.isInstanceOf[ControlStructure] ||
       v.isInstanceOf[JumpTarget]
-  )
+  ) || v.properties.contains("PRESENCE_CONDITION")
 
   private def inEdgesToDisplay(dstNode: StoredNode, visited: List[StoredNode] = List())(implicit
     semantics: Semantics

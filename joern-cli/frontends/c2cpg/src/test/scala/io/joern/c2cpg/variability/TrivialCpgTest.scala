@@ -116,7 +116,7 @@ int main(char a, int b) {
     printf("hello");
     }
     }""".stripMargin*/
-/*  cCode =
+  val cCode =
     """
 
   int main(char a, int b) {
@@ -128,7 +128,7 @@ int main(char a, int b) {
     (b);
     return a;
   }
-  """*/
+  """
 
 /*  cCode =
     """
@@ -179,7 +179,7 @@ void foo() {
 
   // Yamaguchi paper
 
-  val cCode =
+/*  val cCode =
     """
 void foo() {
     int x = 5; 
@@ -187,7 +187,7 @@ void foo() {
         int y = 2*x;
             sink(y);
     }
-}"""
+}"""*/
 
 /*
   val cCode =

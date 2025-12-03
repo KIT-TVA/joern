@@ -6,6 +6,7 @@ import io.joern.x2cpg.datastructures.VariableScopeManager
 import io.joern.x2cpg.{Ast, AstCreatorBase, AstEdge, ValidationMode}
 import io.shiftleft.codepropertygraph.generated.*
 import io.shiftleft.codepropertygraph.generated.nodes.*
+import org.eclipse.cdt.core.dom.ast.IASTBinaryExpression
 import org.slf4j.{Logger, LoggerFactory}
 import superc.core.PresenceConditionManager
 import superc.core.PresenceConditionManager.PresenceCondition
@@ -32,22 +33,25 @@ class VAstCreator(
   private val OperatorMap: Map[String, String] = Map(
 
     ">" -> Operators.greaterThan,
-    /*IASTBinaryExpression.op_multiply -> Operators.multiplication,
-    IASTBinaryExpression.op_divide -> Operators.division,
-    IASTBinaryExpression.op_modulo -> Operators.modulo,
-    IASTBinaryExpression.op_plus -> Operators.addition,
-    IASTBinaryExpression.op_minus -> Operators.subtraction,
-    IASTBinaryExpression.op_shiftLeft -> Operators.shiftLeft,
+    "*" -> Operators.multiplication,
+    "/" -> Operators.division,
+    "%"-> Operators.modulo,
+    "+" -> Operators.addition,
+    "-" -> Operators.subtraction,
+    "=" -> Operators.assignment,
+    "<" -> Operators.lessThan,
+    "<=" -> Operators.lessEqualsThan,
+    "=" -> Operators.equals,
+    ">=" -> Operators.greaterEqualsThan,
+
+
+    /*IASTBinaryExpression.op_shiftLeft -> Operators.shiftLeft,
     IASTBinaryExpression.op_shiftRight -> Operators.arithmeticShiftRight,
-    IASTBinaryExpression.op_lessThan -> Operators.lessThan,
-    IASTBinaryExpression.op_lessEqual -> Operators.lessEqualsThan,
-    IASTBinaryExpression.op_greaterEqual -> Operators.greaterEqualsThan,
     IASTBinaryExpression.op_binaryAnd -> Operators.and,
     IASTBinaryExpression.op_binaryXor -> Operators.xor,
     IASTBinaryExpression.op_binaryOr -> Operators.or,
     IASTBinaryExpression.op_logicalAnd -> Operators.logicalAnd,
     IASTBinaryExpression.op_logicalOr -> Operators.logicalOr,
-    IASTBinaryExpression.op_assign -> Operators.assignment,
     IASTBinaryExpression.op_multiplyAssign -> Operators.assignmentMultiplication,
     IASTBinaryExpression.op_divideAssign -> Operators.assignmentDivision,
     IASTBinaryExpression.op_moduloAssign -> Operators.assignmentModulo,
@@ -58,7 +62,6 @@ class VAstCreator(
     IASTBinaryExpression.op_binaryAndAssign -> Operators.assignmentAnd,
     IASTBinaryExpression.op_binaryXorAssign -> Operators.assignmentXor,
     IASTBinaryExpression.op_binaryOrAssign -> Operators.assignmentOr,
-    IASTBinaryExpression.op_equals -> Operators.equals,
     IASTBinaryExpression.op_notequals -> Operators.notEquals,
     IASTBinaryExpression.op_pmdot -> Operators.indirectFieldAccess,
     IASTBinaryExpression.op_pmarrow -> Operators.indirectFieldAccess,
@@ -166,6 +169,20 @@ class VAstCreator(
     InitializerOpt(Initializer(superc.core.Syntax$Text("5"))))*/
 
 
+
+
+  /*DeclaringList(superc.core.Syntax$Language("int"),
+
+ ArrayDeclarator(SimpleDeclarator(superc.core.Syntax$Text("a")),
+
+ ArrayAbstractDeclarator(superc.core.Syntax$Text("21"))),
+
+ AssemblyExpressionOpt(),
+
+ AttributeSpecifierListOpt(),
+
+ InitializerOpt())*/
+
   private def astForDeclarationList(declaration: Node): Ast = {
     // We do not support int x, y = 5;
     // Todo: typedefs, part of class etc
@@ -182,8 +199,10 @@ class VAstCreator(
     val declAst = Ast(node)
     var initAst = Ast()
     if(InitializerOpt.size() > 0) {
-      initAst = astForInitializer(declarator, InitializerOpt.getNode(0))
+      initAst = astForInitializer(declaration, InitializerOpt.getNode(0))
     }
+    //TODO:
+//    Seq(Ast(node), initAst)
 
     initAst
   }
@@ -196,7 +215,7 @@ class VAstCreator(
   private def astForInitializer(declarator: Node, init: Node): Ast = {
     init match {
       case equalInit: Node if equalInit.hasName("Initializer") =>
-        astForEqualsInitializer(declarator, convertXTCNodeToJoern(declarator), convertXTCNodeToJoern(equalInit.getNode(0)))
+        astForEqualsInitializer(declarator, convertXTCNodeToJoern(declarator.getNode(1)), convertXTCNodeToJoern(equalInit.getNode(0)))
       case _ => Ast()
     }
   }
@@ -240,6 +259,7 @@ class VAstCreator(
       convertXTCNodeToJoern(stringLitList.getNode(0))
     }
     else {
+      //TODO: Handle this case correctly, how do we even get into this case?
       val literals = getChildren(stringLitList).map(convertXTCNodeToJoern)
       Ast()
       /* Ast(
@@ -387,14 +407,14 @@ class VAstCreator(
 
   override protected def code(node: Node): String = {
 
-    if (node.hasName("ExpressionStatement") && node.getNode(0).hasName("FunctionCall")) {
+   /* if (node.hasName("ExpressionStatement") && node.getNode(0).hasName("FunctionCall")) {
       val nameNode = node.getNode(0).getNode(0)
       if (isChoiceNode(nameNode)) {
         val argNodes = node.getNode(0).getNode(1)
         val argsCode = code(argNodes)
         return getChildren(nameNode).map(code(_) + " " + argsCode).mkString(" ")
       }
-    }
+    }*/
 
     val nodes = collectAllNodes(node)
     nodes.flatMap { n =>
@@ -455,7 +475,7 @@ class VAstCreator(
       }
       // If the name node is not a choice node we can easily translate it.
       case _ =>
-        val name = nameNode.toString
+        val name = nameNode.getNode(0).getString(0)
         val dispatchType = DispatchTypes.STATIC_DISPATCH
         val callCpgNode =
           callNode(expressionStatement, code(expressionStatement), name, name, dispatchType, Some(""), Some("registerType(callTypeFullName)"))
@@ -556,7 +576,7 @@ class VAstCreator(
       Ast(
         nodes = Seq(choiceNode) ++ leftAst.nodes ++ rightAst.nodes,
         edges = leftAst.edges ++ rightAst.edges ++ presenceConditionEdges,
-        conditionEdges = leftAst.conditionEdges ++ rightAst.conditionEdges ++ Seq(AstEdge(choiceNode, choiceNode)), //TODO: ++ presenceConditionEdges?
+        conditionEdges = leftAst.conditionEdges ++ rightAst.conditionEdges, //++ Seq(AstEdge(choiceNode, choiceNode)), //TODO: ++ presenceConditionEdges?
         argEdges = leftAst.argEdges ++ rightAst.argEdges,
         receiverEdges = leftAst.receiverEdges ++ rightAst.receiverEdges,
         refEdges = leftAst.refEdges ++ rightAst.refEdges,
