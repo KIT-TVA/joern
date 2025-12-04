@@ -13,7 +13,7 @@ import io.joern.x2cpg.passes.frontend.MetaDataPass
 import io.joern.x2cpg.testfixtures.Code2CpgFixture
 import io.shiftleft.codepropertygraph.Cpg
 import io.shiftleft.codepropertygraph.generated.{DiffGraphBuilder, Languages, nodes}
-import io.shiftleft.semanticcpg.dotgenerator.DotAstGenerator
+import io.shiftleft.semanticcpg.dotgenerator.{DotAstGenerator, DotCfgGenerator}
 import superc.SuperC
 
 import java.io.{File, StringReader}
@@ -29,7 +29,9 @@ void foo() {
 
   val cCpg = code(cCode)
   val cTraversal = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
-  val cAstDotString = DotAstGenerator.dotAst(cTraversal)
+//  val cAstDotString = DotAstGenerator.dotAst(cTraversal)
+val cAstDotString = DotCfgGenerator.dotCfg(cTraversal).mkString
+
   println(cAstDotString.mkString)
   println()
   println()

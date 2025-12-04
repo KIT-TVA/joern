@@ -20,7 +20,9 @@ class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPa
 
   override def runOnPart(diffGraph: DiffGraphBuilder, method: Method): Unit = {
     val localDiff = Cpg.newDiffGraphBuilder
-    new CfgCreator(method, localDiff).run()
+    cpg.astNode
+    
+//    new CfgCreator(method, localDiff).run()
     diffGraph.absorb(localDiff)
   }
 

@@ -10,6 +10,7 @@ import io.joern.dataflowengineoss.semanticsloader.Semantics
 import io.joern.x2cpg.X2Cpg
 import io.joern.x2cpg.X2Cpg.newEmptyCpg
 import io.joern.x2cpg.passes.frontend.MetaDataPass
+import io.joern.x2cpg.passes.variability.PdgPresenceConditionAnnotationPass
 import io.joern.x2cpg.testfixtures.Code2CpgFixture
 import io.shiftleft.codepropertygraph.Cpg
 import io.shiftleft.codepropertygraph.generated.{DiffGraphBuilder, Languages, nodes}
@@ -26,10 +27,8 @@ void foo() {
     int x = 3;
     #ifdef MACRO
        sink(x);
-    #else
-        int y = 10;
-       bar(y);
     #endif
+    bar(x);
 }"""
   val stringReader = new StringReader(cCode)
 
@@ -49,10 +48,12 @@ void foo() {
   X2Cpg.applyDefaultOverlays(superCpg)
 
   new ReachingDefPass(superCpg).createAndApply()
+  new PdgPresenceConditionAnnotationPass(superCpg).createAndApply()
   val superCTraversal = superCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
 //  val superCAstDotString = DotCpg14Generator.toDotCpg14(superCTraversal).mkString
-  val superCAstDotString = DotAstGenerator.dotAst(superCTraversal).mkString
-//val superCAstDotString = DotCfgGenerator.dotCfg(superCTraversal).mkString
+//  val superCAstDotString = DotAstGenerator.dotAst(superCTraversal).mkString
+  val superCAstDotString = DotCfgGenerator.dotCfg(superCTraversal).mkString
+//  val superCAstDotString = DotDdgGenerator.toDotDdg(superCTraversal).mkString
 
 
   println(superCAstDotString)

@@ -486,12 +486,34 @@ class CfgCreator(entryNode: Method, diffGraph: DiffGraphBuilder) {
     }*/
 
 
-    val choiceStatementFringe =
+    /*val choiceStatementFringe =
       if (leftCfg.entryNode.isEmpty && rightCfg.entryNode.isEmpty) {
         choiceNodeCfg.fringe.withEdgeType(AlwaysEdge)
       } else {
         leftCfg.fringe ++ rightCfg.fringe
+      }*/
+
+
+    val choiceStatementFringe =
+      if (leftCfg.entryNode.isEmpty && rightCfg.entryNode.isEmpty) {
+        choiceNodeCfg.fringe.withEdgeType(AlwaysEdge)
+      } else {
+        val trueFringe = if (leftCfg.entryNode.isDefined) {
+          leftCfg.fringe
+        } else {
+          choiceNodeCfg.fringe.withEdgeType(AlwaysEdge)
+        }
+
+        val falseFringe =
+          if (rightCfg.entryNode.isDefined) {
+            rightCfg.fringe
+          } else {
+            choiceNodeCfg.fringe.withEdgeType(AlwaysEdge)
+          }
+
+        trueFringe ++ falseFringe
       }
+
     Cfg
       .from(choiceNodeCfg, leftCfg, rightCfg)
       .copy(

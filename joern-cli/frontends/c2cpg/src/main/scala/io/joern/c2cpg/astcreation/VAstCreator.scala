@@ -549,7 +549,7 @@ class VAstCreator(
     val presenceCondition: PresenceCondition = choiceStatement.get(0) match {
       case pc: PresenceCondition => pc
     }
-    if (presenceCondition.isTrue) {
+    if (presenceCondition.isTrue || choiceStatement.getNode(1).hasName("PrimaryIdentifier")) {
       convertXTCNodeToJoern(choiceStatement.getNode(1))
     }
     else {
