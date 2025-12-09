@@ -116,7 +116,7 @@ int main(char a, int b) {
     printf("hello");
     }
     }""".stripMargin*/
-  val cCode =
+/*  val cCode =
     """
 
   int main(char a, int b) {
@@ -128,7 +128,28 @@ int main(char a, int b) {
     (b);
     return a;
   }
+  """*/
+    val cCode =
+    """
+
+  int main(char a, int b) {
+  int a = 42;
+  int b = 42;
+  int c = 42;
+  #ifdef MACRO1
+    b++;
+  #else
+  #ifdef MACRO2
+    c++;
+  #endif
+  #endif
+
+  printf("%i", a);
+  return 0;
+  }
   """
+
+
 
 /*  cCode =
     """
@@ -242,6 +263,7 @@ int main(char a, int b) {
 //  new PresenceConditionPass(superCpg, presenceConditionMap).createAndApply()
 //  superCpg.graph.allNodes.toList(3).asInstanceOf[ControlStructure].properties
   X2Cpg.applyDefaultOverlays(superCpg)
+  X2Cpg.applyDefaultOverlays(superCpg)
 
   // Get dot representation
 
@@ -252,9 +274,9 @@ int main(char a, int b) {
 
   val cCpg = code(cCode)
   val cTraversal = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
-  val cAstDotString = DotDdgGenerator.toDotDdg(cTraversal)
+//  val cAstDotString = DotDdgGenerator.toDotDdg(cTraversal)
 //  val cAstDotString = DotPdgGenerator.toDotPdg(cTraversal)
-//  val cAstDotString = DotCpg14Generator.toDotCpg14(cTraversal)
+  val cAstDotString = DotCpg14Generator.toDotCpg14(cTraversal)
   cCpg.close()
 
   val superCSstring = superCAstDotString.mkString

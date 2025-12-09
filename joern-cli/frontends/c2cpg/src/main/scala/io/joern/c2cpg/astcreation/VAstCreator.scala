@@ -631,41 +631,4 @@ class VAstCreator(
 
 
 
-/*
-//This is what intellijs AI suggested, but it is quatsch
-def deepCopyNode(node: Node): Node = {
-  node match {
-    case gnode: GNode =>
-      val copy = GNode.create(gnode.getName)
-      // Kopiere Location falls vorhanden
-      if (node.hasLocation) {
-        copy.setLocation(node.getLocation)
-      }
-      // Kopiere Properties
-      node.properties.forEach { name =>
-        copy.setProperty(name, node.getProperty(name))
-      }
-      // Kopiere alle Kinder rekursiv
-      for (i <- 0 until node.size()) {
-        node.get(i) match {
-          case childNode: Node => copy.add(deepCopyNode(childNode))
-          case other => copy.add(other) // Primitive Werte wie String, Int etc.
-        }
-      }
-      copy
-
-    case token: Token =>
-      // Für Tokens erstellen Sie eine neue Instanz
-      val newToken = new Token(token.getTokenText)
-      if (node.hasLocation) {
-        newToken.setLocation(node.getLocation)
-      }
-      newToken
-
-    case _ =>
-      // Fallback: versuchen Sie eine generische Kopie
-      throw new UnsupportedOperationException(s"Deep copy not supported for node type: ${node.getClass.getName}")
-  }
-}*/
-
 
