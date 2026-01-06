@@ -545,7 +545,19 @@ class VAstCreator(
     controlStructureAst(ifNode, Option(condAst), Seq(thenAst, elseAst))
   }
 
+  //TODO: line number, column number und code + wenn left and right ast equal => einen kann man entfernen?
+  // Nein! Man muss beide da behalten, muss in presenceConditionMap gesondert gehandled werdem!
   private def astForChoiceNode(choiceStatement: Node): Ast = {
+
+    // This "ID" is not unique and just a workaround, because AstNodes do not have IDs, but we need to identify them
+    // to assign presenceCondition properties to them, when they are children of a choice node.
+    def calculateAstNodeId(node: NewNode): String = {
+      val lineNumber = node.properties("LINE_NUMBER").asInstanceOf[Int]
+      val columnNumber = node.properties("COLUMN_NUMBER").asInstanceOf[Int]
+      val code = node.properties("CODE").asInstanceOf[String]
+      s"$lineNumber, $columnNumber $code"
+    }
+
     val presenceCondition: PresenceCondition = choiceStatement.get(0) match {
       case pc: PresenceCondition => pc
     }
@@ -556,19 +568,33 @@ class VAstCreator(
       val choiceNode = controlStructureNode(choiceStatement, ControlStructureTypes.CHOICE, code(choiceStatement))
       val leftAst = convertXTCNodeToJoern(choiceStatement.getNode(1))
       var rightAst = Ast()
-      //      var presenceConditionMap : Map[Int, PresenceCondition] = Map(leftAst.hashCode() -> presenceCondition)
-      var presenceConditionMap: Map[Int, String] = Map(0 -> presenceCondition.toString)
+
+      val leftId = calculateAstNodeId(leftAst.root.get)
+      var presenceConditionMap: Map[String, String] =
+        Map(leftId -> presenceCondition.toString)
 
       var presenceConditionEdges = Seq(AstEdge(choiceNode, leftAst.root.get))
       if (choiceStatement.size() == 4) {
         rightAst = convertXTCNodeToJoern(choiceStatement.getNode(3))
         //TODO wieder rein kommentiewren: Ast.neighbourValidation(choiceNode, rightAst.root.get, EdgeTypes.AST)
+//        rightAst.root.get.storedRef
         presenceConditionEdges = presenceConditionEdges :+ AstEdge(choiceNode, rightAst.root.get)
         val negatedPresenceCondition = choiceStatement.get(2) match {
           case pc: PresenceCondition => pc
         }
-        //        presenceConditionMap = presenceConditionMap + (rightAst.hashCode() -> negatedPresenceCondition)
-        presenceConditionMap = presenceConditionMap + (1 -> negatedPresenceCondition.toString)
+        val rightId = calculateAstNodeId(rightAst.root.get)
+
+        // This should just evaluate to true in the case of
+        //                                          Choice
+        //                             (macro, node)      (!macro, node)
+        // where we can just replace the choice node with one of its child nodes.
+        if (leftId == rightId){
+          return leftAst
+        }
+        presenceConditionMap =  presenceConditionMap + (rightId-> negatedPresenceCondition.toString)
+      }
+      else{
+        presenceConditionMap = presenceConditionMap + ("UNKNOWN" -> presenceCondition.not().toString)
       }
       val presenceConditionMapSerialized = presenceConditionMap.asJson.noSpaces
       choiceNode.presenceCondition(presenceConditionMapSerialized)

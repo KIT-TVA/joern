@@ -1,28 +1,20 @@
 package io.joern.c2cpg.passes.variability
 
-import flatgraph.{Edge, GNode}
-import io.joern.x2cpg.passes.controlflow.cfgcreation.CfgCreator
+import flatgraph.GNode
+import io.circe.parser.decode
 import io.shiftleft.codepropertygraph.generated.Cpg
-import io.shiftleft.codepropertygraph.generated.edges.ReachingDef
-import io.shiftleft.codepropertygraph.generated.nodes.{Call, Method}
+import io.shiftleft.codepropertygraph.generated.nodes.{ControlStructure, Method, StoredNode}
 import io.shiftleft.passes.ForkJoinParallelCpgPass
-import io.shiftleft.proto.cpg.Cpg.CpgStruct.Node
-import io.shiftleft.semanticcpg.language.*
-import flatgraph.traversal._
-import io.joern.dataflowengineoss.language.ExtendedCfgNode
-import io.joern.dataflowengineoss.queryengine.{EngineConfig, EngineContext}
-import io.joern.dataflowengineoss.language.toExtendedCfgNode
-import io.joern.dataflowengineoss.language.*
 import io.shiftleft.semanticcpg.language.*
 
 /** A pass that creates control flow graphs from abstract syntax trees.
-  *
-  * Control flow graphs can be calculated independently per method. Therefore, we inherit from
-  * `ForkJoinParallelCpgPass`.
-  *
-  * Note: the version of OverflowDB that we currently use as a storage backend does not assign ids to edges and this
-  * pass only creates edges at the moment. Therefore, we currently do without key pools.
-  */
+ *
+ * Control flow graphs can be calculated independently per method. Therefore, we inherit from
+ * `ForkJoinParallelCpgPass`.
+ *
+ * Note: the version of OverflowDB that we currently use as a storage backend does not assign ids to edges and this
+ * pass only creates edges at the moment. Therefore, we currently do without key pools.
+ */
 class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPass[Method](cpg) {
 
   override def generateParts(): Array[Method] = {
@@ -31,77 +23,90 @@ class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPa
   }
 
   override def runOnPart(diffGraph: DiffGraphBuilder, method: Method): Unit = {
-    val bla = method._cfgOut.repeat(_.out("CFG"))()
+    //    val bla = method._cfgOut.repeat(_.out("CFG"))()
     println(method.name)
-    val localDiff = Cpg.newDiffGraphBuilder
-    cpg.astNode
-//    reachableBy(bla)
+//    val localDiff = Cpg.newDiffGraphBuilder
 
 
-/*
-    def findAllPathsBetween(sourceNode: GNode, targetNode: GNode): Vector[List[GNode]] = {
-      implicit val context: EngineContext = EngineContext()
+    /*def presenceConditionsReachFromEntry(entry: Method, sources: Iterator[GNode]): Map[GNode, String] = {
+      var visitedNodes: Set[GNode] = Set()
+      var workingSet: Seq[GNode] = Seq(entry)
+      while (workingSet.nonEmpty) {
 
 
-      val srcExtended = toExtendedCfgNode(sourceNode)
-      val detailedPaths = srcExtended.reachableByDetailed(Iterator.single(targetNode))
-
-      detailedPaths.map(_.path.map(_.node).toList)
-    }
-*/
-
-
-    def presenceConditionsReachFromEntry(entry: Method, sources: Iterator[GNode]): Map[GNode, String] = {
+        visitedNodes = visitedNodes ++ workingSet.toSet
+        workingSet = workingSet.filter(visitedNodes.contains(_))
+      }
       Map()
+    }*/
+
+
+    def getPresenceCondition(src: GNode, dst: GNode): String = {
+      def calculateStoredNodeId(node: StoredNode): String = {
+        val lineNumber = node.properties("LINE_NUMBER").asInstanceOf[Int]
+        val columnNumber = node.properties("COLUMN_NUMBER").asInstanceOf[Int]
+        val code = node.properties("CODE").asInstanceOf[String]
+        s"$lineNumber, $columnNumber $code"
+      }
+
+      if (src.nodeKind == 11) {
+        src match {
+          case node: ControlStructure =>
+            val jsonString = src.asInstanceOf[ControlStructure].property[String]("PRESENCE_CONDITION")
+            val presenceConditionMap = decode[Map[String, String]](jsonString).getOrElse(Map.empty)
+
+            val dstLocationString = calculateStoredNodeId(dst.asInstanceOf[StoredNode])
+            val t = presenceConditionMap.getOrElse(dstLocationString, presenceConditionMap.getOrElse("UNKNOWN", "ERROR"))
+            t
+          case _ => ""
+        }
+      }
+      else {
+        ""
+      }
     }
+
 
     def presenceConditionBetween(src: GNode, dst: GNode): String = {
-      //TODO: Calculate all possible paths from src to dst and collect presence conditions on the way, then or and return them
-      ""
-    }
+      // node we are processing on this path -> (collected presence conditions on this path, visited nodes on this path)
+      var workingSet: Map[GNode, (String, Set[GNode])] = Map((src, ("1", Set())))
+      var presenceConditions: Seq[String] = Seq()
 
-    val reachingDefEdges = method.graph.allEdges.filter(_.property != null)
-//    val test = findAllPathsBetween(reachingDefEdges.head.src, reachingDefEdges.head.dst)
-    val testEdge = reachingDefEdges.head
-    ExtendedCfgNode(testEdge.src.toI) //reachableByFlows(testEdge.dst)
+      def expandNode(arg: (GNode, (String, Set[GNode]))): Seq[(GNode, (String, Set[GNode]))] = {
+        val (node: GNode, (presenceCondition: String, visitedNodes: Set[GNode])) = arg
+        val successorNodes: Seq[GNode] = node.out("CFG").toSeq.filter(!visitedNodes.contains(_))
 
-
-    val reachingDefDefSources = reachingDefEdges.map(_.src)
-    val reachingDefSourcesPresenceConditions = presenceConditionsReachFromEntry(method, reachingDefDefSources)
-
-    val reachingDefDestinations = reachingDefDefSources.zip(reachingDefEdges.map(_.dst))
-
-//    val reachingDefEdgePresenceConditions =
-
-
-
-
-
-
-
-    def func(edge: Edge): Unit = {
-      //TODO: Wir müssen alle presence conditions sammeln, auf einem pfad verunden und sonst verodern!
-      edge.src.asInstanceOf[Call]._astOut
-//      bla(edge.dst)
-    }
-
-    def collectAllPresenceConditions(src: GNode, dst: GNode, presenceConditions: Option[String] = None): Option[String] = {
-      if (src.asInstanceOf[Call]._cfgOut.isEmpty){
-        return None
+        successorNodes.map { succNode =>
+          val newPresenceCondition = getPresenceCondition(node, succNode) match {
+            case "" => presenceCondition
+            case value: String => presenceCondition + " && " + value
+          }
+          if (succNode == dst) {
+            presenceConditions = presenceConditions ++ Seq(newPresenceCondition)
+            None
+          }
+          else {
+            Some((succNode, (newPresenceCondition, visitedNodes ++ Set(node))))
+          }
+        }.collect { case Some(v) => v }
       }
-      val paths = src.asInstanceOf[Call]._cfgOut.map{
-          node => 
-            if(node == dst){
-              Some("")
-            }
-            else{
-              val result = collectAllPresenceConditions(node, dst)
-            }
-        }
-      Some("")
+
+      while (workingSet.nonEmpty) {
+        workingSet = workingSet.flatMap(expandNode)
+
+      }
+      presenceConditions.mkString(" || ")
     }
-//    new CfgCreator(method, localDiff).run()
-    diffGraph.absorb(localDiff)
+
+
+
+    val reachingDefEdges = method.graph.allEdges.toList.filter(_.property != null)
+
+    val test = reachingDefEdges.map(edge => presenceConditionBetween(edge.src, edge.dst))
+    test
+    //    val reachingDefDefSources = reachingDefEdges.map(_.src)
+    print(test.toList.mkString)
+//    diffGraph.absorb(localDiff)
   }
 
 }

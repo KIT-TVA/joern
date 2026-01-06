@@ -476,7 +476,8 @@ class CfgCreator(entryNode: Method, diffGraph: DiffGraphBuilder) {
     //TODO: this could be part of the problems:
     val leftCfg = node.traversal.out.collectAll[AstNode].order(1).headOption.map(cfgFor).getOrElse(Cfg.empty)
     val rightCfg = node.traversal.out.collectAll[AstNode].order(2).headOption.map(cfgFor).getOrElse(Cfg.empty)
-
+    val x = node.out("AST").toList.map(_.propertiesMap)
+    val y = node.out("CFG").toList.map(_.propertiesMap)
     val diffGraphs = edgesFromFringeTo(choiceNodeCfg, leftCfg.entryNode) ++
       edgesFromFringeTo(choiceNodeCfg, rightCfg.entryNode)
 
