@@ -2,6 +2,7 @@ package io.joern.c2cpg.variability
 
 import io.joern.c2cpg.astcreation.{CGlobal, VAstCreator}
 import io.joern.c2cpg.parser.FileDefaults
+import io.joern.c2cpg.passes.variability.PdgPresenceConditionAnnotationPass
 import io.joern.c2cpg.testfixtures.{AstC2CpgSuite, C2CpgSuite, CDefaultTestCpg}
 import io.joern.dataflowengineoss.DefaultSemantics
 import io.joern.dataflowengineoss.dotgenerator.{DotCpg14Generator, DotDdgGenerator}
@@ -10,7 +11,6 @@ import io.joern.dataflowengineoss.semanticsloader.Semantics
 import io.joern.x2cpg.X2Cpg
 import io.joern.x2cpg.X2Cpg.newEmptyCpg
 import io.joern.x2cpg.passes.frontend.MetaDataPass
-import io.joern.x2cpg.passes.variability.PdgPresenceConditionAnnotationPass
 import io.joern.x2cpg.testfixtures.Code2CpgFixture
 import io.shiftleft.codepropertygraph.Cpg
 import io.shiftleft.codepropertygraph.generated.{DiffGraphBuilder, Languages, nodes}
@@ -24,12 +24,11 @@ class DDGWithVariabilityTest extends C2CpgSuite(withOssDataflow = true){
   val cCode =
     """
 void foo() {
+    int a = 42;
     #ifdef MACRO
-       int Y = 10;
-    #else
-       int Y = 37;
+    foo(a);
     #endif
-    bar(Y);
+    bar(a);
 }"""
   val stringReader = new StringReader(cCode)
 
@@ -51,10 +50,11 @@ void foo() {
   new ReachingDefPass(superCpg).createAndApply()
   new PdgPresenceConditionAnnotationPass(superCpg).createAndApply()
   val superCTraversal = superCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
-//  val superCAstDotString = DotCpg14Generator.toDotCpg14(superCTraversal).mkString
+  
+  val superCAstDotString = DotCpg14Generator.toDotCpg14(superCTraversal).mkString
 //  val superCAstDotString = DotAstGenerator.dotAst(superCTraversal).mkString
 //  val superCAstDotString = DotCfgGenerator.dotCfg(superCTraversal).mkString
-  val superCAstDotString = DotDdgGenerator.toDotDdg(superCTraversal).mkString
+//  val superCAstDotString = DotDdgGenerator.toDotDdg(superCTraversal).mkString
 
 
   println(superCAstDotString)

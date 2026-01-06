@@ -26,7 +26,7 @@ class PresenceConditionPass(cpg: Cpg, presenceConditionMap: Map[String, Presence
     val bla = controlStructures.map(_.argumentName)
     controlStructures.foreach{cs =>
       dstGraph.setNodeProperty(cs, PropertyNames.PresenceCondition, presenceConditionMap.get(cs.argumentName.get).toString)}
-//    dstGraph.
+//    dstGraph.                                                                                                             
 //    dstGraph.setEdgeProperty(cpg.graph.allEdges.head, "test")
    /* var hadMissingTypeDecl = false
     cpg.typ.filter(typeNeedsTypeDeclStub).foreach { t =>

@@ -19,19 +19,17 @@ import superc.SuperC
 
 import java.io.{File, StringReader}
 
-class CDGWithVariabilityTest extends C2CpgSuite(withOssDataflow = true){
+class DDGWithVariabilityDoubleAssignmentTest extends C2CpgSuite(withOssDataflow = true){
   implicit val semantics: Semantics = DefaultSemantics()
   val cCode =
     """
+void foo() {
     #ifdef MACRO
- #define LIMIT 10
-#else
-#define LIMIT 2
-#endif
-    void foo(int a) {
-    if (a < LIMIT){
-      printf("Hello World!\n");
-    }
+       int Y = 10;
+    #else
+       int Y = 37;
+    #endif
+    bar(Y);
 }"""
   val stringReader = new StringReader(cCode)
 
@@ -51,10 +49,10 @@ class CDGWithVariabilityTest extends C2CpgSuite(withOssDataflow = true){
   X2Cpg.applyDefaultOverlays(superCpg)
 
   new ReachingDefPass(superCpg).createAndApply()
-  new PdgPresenceConditionAnnotationPass(superCpg).createAndApply()
+  //new PdgPresenceConditionAnnotationPass(superCpg).createAndApply()
   val superCTraversal = superCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
-  val superCAstDotString = DotCpg14Generator.toDotCpg14(superCTraversal).mkString
-//  val superCAstDotString = DotAstGenerator.dotAst(superCTraversal).mkString
+//  val superCAstDotString = DotCpg14Generator.toDotCpg14(superCTraversal).mkString
+  val superCAstDotString = DotAstGenerator.dotAst(superCTraversal).mkString
 //  val superCAstDotString = DotCfgGenerator.dotCfg(superCTraversal).mkString
 //  val superCAstDotString = DotDdgGenerator.toDotDdg(superCTraversal).mkString
 

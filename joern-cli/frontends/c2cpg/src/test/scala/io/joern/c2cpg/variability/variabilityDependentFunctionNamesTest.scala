@@ -19,20 +19,19 @@ import superc.SuperC
 
 import java.io.{File, StringReader}
 
-class CDGWithVariabilityTest extends C2CpgSuite(withOssDataflow = true){
+class variabilityDependentFunctionNamesTest extends C2CpgSuite(withOssDataflow = true){
   implicit val semantics: Semantics = DefaultSemantics()
   val cCode =
     """
-    #ifdef MACRO
- #define LIMIT 10
-#else
-#define LIMIT 2
-#endif
-    void foo(int a) {
-    if (a < LIMIT){
-      printf("Hello World!\n");
+    int main(int a){
+    #ifdef macro
+    foo
+    #else
+    bar
+    #endif
+    (a);
     }
-}"""
+    """
   val stringReader = new StringReader(cCode)
 
   val dummyFile = new File("test.c")

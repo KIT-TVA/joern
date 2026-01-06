@@ -129,7 +129,7 @@ int main(char a, int b) {
     return a;
   }
   """*/
-    val cCode =
+  /*  val cCode =
     """
 
   int main(char a, int b) {
@@ -148,24 +148,36 @@ int main(char a, int b) {
   return 0;
   }
   """
+*/
 
-
-
-/*  cCode =
+  val cCode =
     """
-      int main() {
-          int a, x = 5;
-          int b = 0;
 
-      #ifdef MACRO
-          b = 0;
-      #else
-          b = 42;
-      #endif
+int main(char a, int b) {
+if(a == "d"){
+foo(a);
+}
+    else{bar(a);}
+}
+"""
 
-          return b;
-      }
-      """*/
+
+
+  /*  cCode =
+      """
+        int main() {
+            int a, x = 5;
+            int b = 0;
+
+        #ifdef MACRO
+            b = 0;
+        #else
+            b = 42;
+        #endif
+
+            return b;
+        }
+        """*/
 
     /*val cCode =
       """
@@ -259,10 +271,9 @@ int main(char a, int b) {
   val vAstCreator = VAstCreator("test.c", globalSuperC, superCParseResult)
   val diffGraph: DiffGraphBuilder = vAstCreator.createAst()
   flatgraph.DiffGraphApplier.applyDiff(superCpg.graph, diffGraph)
-  val presenceConditionMap: Map[String, PresenceConditionManager.PresenceCondition] = vAstCreator.getPresenceConditionMap
+//  val presenceConditionMap: Map[String, PresenceConditionManager.PresenceCondition] = vAstCreator.getPresenceConditionMap
 //  new PresenceConditionPass(superCpg, presenceConditionMap).createAndApply()
 //  superCpg.graph.allNodes.toList(3).asInstanceOf[ControlStructure].properties
-  X2Cpg.applyDefaultOverlays(superCpg)
   X2Cpg.applyDefaultOverlays(superCpg)
 
   // Get dot representation
@@ -274,9 +285,9 @@ int main(char a, int b) {
 
   val cCpg = code(cCode)
   val cTraversal = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
-//  val cAstDotString = DotDdgGenerator.toDotDdg(cTraversal)
-//  val cAstDotString = DotPdgGenerator.toDotPdg(cTraversal)
-  val cAstDotString = DotCpg14Generator.toDotCpg14(cTraversal)
+  val cAstDotString = DotDdgGenerator.toDotDdg(cTraversal)
+//  val cAstDotString = DotPdgGeneratosr.toDotPdg(cTraversal)
+//  val cAstDotString = DotCpg14Generator.toDotCpg14(cTraversal)
   cCpg.close()
 
   val superCSstring = superCAstDotString.mkString
