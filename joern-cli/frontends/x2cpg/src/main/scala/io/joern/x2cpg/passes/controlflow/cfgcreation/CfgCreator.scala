@@ -6,6 +6,9 @@ import io.shiftleft.codepropertygraph.generated.{ControlStructureTypes, Dispatch
 import io.shiftleft.semanticcpg.language.*
 import io.shiftleft.codepropertygraph.generated.DiffGraphBuilder
 import io.shiftleft.semanticcpg.language.types.expressions.ControlStructureTraversal.thirdChildIndex
+import io.circe.parser.decode
+import io.circe.syntax.*
+
 
 /** Translation of abstract syntax trees into control flow graphs
   *
@@ -122,7 +125,7 @@ class CfgCreator(entryNode: Method, diffGraph: DiffGraphBuilder) {
       case _: Block =>
         cfgForChildren(node) ++ cfgForSingleNode(node.asInstanceOf[CfgNode])
       case _: Call | _: FieldIdentifier | _: Identifier | _: Literal | _: Block | _: Unknown =>
-        cfgForChildren(node) ++ cfgForSingleNode(node.asInstanceOf[CfgNode])
+        cfgForSingleNode(node.asInstanceOf[CfgNode]) ++ cfgForChildren(node)  
       case _ =>
         cfgForChildren(node)
     }
@@ -476,23 +479,34 @@ class CfgCreator(entryNode: Method, diffGraph: DiffGraphBuilder) {
     //TODO: this could be part of the problems:
     val leftCfg = node.traversal.out.collectAll[AstNode].order(1).headOption.map(cfgFor).getOrElse(Cfg.empty)
     val rightCfg = node.traversal.out.collectAll[AstNode].order(2).headOption.map(cfgFor).getOrElse(Cfg.empty)
-    val x = node.out("AST").toList.map(_.propertiesMap)
-    val y = node.out("CFG").toList.map(_.propertiesMap)
+
+
+    val jsonString = node.property[String]("PRESENCE_CONDITION")
+    var presenceConditionMap: Map[String, String] = decode[Map[String, String]](jsonString).getOrElse(Map.empty)
+
+    def calculateStoredNodeId(node: StoredNode): String = {
+      node.id().toString
+    }
+
+    // We need to do this, because the AST children of choice nodes are not necessarily also the CFG children!
+    val leftPresenceCondition = presenceConditionMap.getOrElse("AST1", "ERROR")
+    val leftCfgNodeId = calculateStoredNodeId(leftCfg.entryNode.get)
+    presenceConditionMap = presenceConditionMap + (leftCfgNodeId -> leftPresenceCondition)
+    if (rightCfg.entryNode.nonEmpty){
+      val rightPresenceCondition = presenceConditionMap.getOrElse("AST2", "ERROR")
+      val rightCfgNodeId = calculateStoredNodeId(rightCfg.entryNode.get)
+      presenceConditionMap = presenceConditionMap + (rightCfgNodeId -> rightPresenceCondition)
+      if(rightCfgNodeId == leftCfgNodeId){
+        println("ERROR in cfg: rightCfgNodeId == leftCfgNodeId!")
+      }
+    }
+    val presenceConditionMapSerialized = presenceConditionMap.asJson.noSpaces
+//    node.presenceCondition(presenceConditionMapSerialized)
+    diffGraph.setNodeProperty(choiceNodeCfg.entryNode.get, presenceConditionMapSerialized, "PRESENCE_CONDITION")
+
     val diffGraphs = edgesFromFringeTo(choiceNodeCfg, leftCfg.entryNode) ++
       edgesFromFringeTo(choiceNodeCfg, rightCfg.entryNode)
 
-
-    /*if(cho>FiceNodeCfg.entryNode.nonEmpty && leftCfg.entryNode.nonEmpty){
-      diffGraphs = List(CfgEdge(choiceNodeCfg.entryNode.get, leftCfg.entryNode.get, AlwaysEdge))
-    }*/
-
-
-    /*val choiceStatementFringe =
-      if (leftCfg.entryNode.isEmpty && rightCfg.entryNode.isEmpty) {
-        choiceNodeCfg.fringe.withEdgeType(AlwaysEdge)
-      } else {
-        leftCfg.fringe ++ rightCfg.fringe
-      }*/
 
 
     val choiceStatementFringe =
