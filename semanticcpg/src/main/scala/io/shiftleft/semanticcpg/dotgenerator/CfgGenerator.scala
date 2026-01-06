@@ -55,8 +55,8 @@ class CfgGenerator {
   private def cfgNodeShouldBeDisplayed(v: StoredNode): Boolean =
     isConditionInControlStructure(v) ||
       hasPresenceConditionProperty(v) ||
-      !(v.isInstanceOf[Literal] ||
-        v.isInstanceOf[Identifier] ||
+      v.isInstanceOf[Identifier] ||
+      (v.isInstanceOf[Literal] ||
         v.isInstanceOf[Block] ||
         v.isInstanceOf[ControlStructure] ||
         v.isInstanceOf[JumpTarget] ||

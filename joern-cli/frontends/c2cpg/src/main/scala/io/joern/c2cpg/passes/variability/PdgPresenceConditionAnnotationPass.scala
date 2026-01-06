@@ -43,6 +43,7 @@ class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPa
 
     def getPresenceCondition(src: GNode, dst: GNode): String = {
       def calculateStoredNodeId(node: StoredNode): String = {
+//        node.id().toString
         val lineNumber = node.properties("LINE_NUMBER").asInstanceOf[Int]
         val columnNumber = node.properties("COLUMN_NUMBER").asInstanceOf[Int]
         val code = node.properties("CODE").asInstanceOf[String]
@@ -57,7 +58,7 @@ class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPa
 
             val dstLocationString = calculateStoredNodeId(dst.asInstanceOf[StoredNode])
             val t = presenceConditionMap.getOrElse(dstLocationString, presenceConditionMap.getOrElse("UNKNOWN", "ERROR"))
-            t
+             t
           case _ => ""
         }
       }
@@ -103,9 +104,9 @@ class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPa
     val reachingDefEdges = method.graph.allEdges.toList.filter(_.property != null)
 
     val test = reachingDefEdges.map(edge => presenceConditionBetween(edge.src, edge.dst))
-    test
+    test.foreach(println)
     //    val reachingDefDefSources = reachingDefEdges.map(_.src)
-    print(test.toList.mkString)
+//    print(test.toList.mkString)
 //    diffGraph.absorb(localDiff)
   }
 

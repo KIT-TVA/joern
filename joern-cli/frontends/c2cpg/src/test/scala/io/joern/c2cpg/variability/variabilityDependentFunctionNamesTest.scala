@@ -52,8 +52,8 @@ class variabilityDependentFunctionNamesTest extends C2CpgSuite(withOssDataflow =
   new ReachingDefPass(superCpg).createAndApply()
   new PdgPresenceConditionAnnotationPass(superCpg).createAndApply()
   val superCTraversal = superCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
-  val superCAstDotString = DotCpg14Generator.toDotCpg14(superCTraversal).mkString
-//  val superCAstDotString = DotAstGenerator.dotAst(superCTraversal).mkString
+//  val superCAstDotString = DotCpg14Generator.toDotCpg14(superCTraversal).mkString
+  val superCAstDotString = DotAstGenerator.dotAst(superCTraversal).mkString
 //  val superCAstDotString = DotCfgGenerator.dotCfg(superCTraversal).mkString
 //  val superCAstDotString = DotDdgGenerator.toDotDdg(superCTraversal).mkString
 

@@ -572,6 +572,7 @@ class VAstCreator(
       val leftId = calculateAstNodeId(leftAst.root.get)
       var presenceConditionMap: Map[String, String] =
         Map(leftId -> presenceCondition.toString)
+      //        Map("AST1" -> presenceCondition.toString)
 
       var presenceConditionEdges = Seq(AstEdge(choiceNode, leftAst.root.get))
       if (choiceStatement.size() == 4) {
@@ -592,6 +593,8 @@ class VAstCreator(
           return leftAst
         }
         presenceConditionMap =  presenceConditionMap + (rightId-> negatedPresenceCondition.toString)
+        
+//        presenceConditionMap =  presenceConditionMap + ("AST2"-> negatedPresenceCondition.toString)
       }
       else{
         presenceConditionMap = presenceConditionMap + ("UNKNOWN" -> presenceCondition.not().toString)

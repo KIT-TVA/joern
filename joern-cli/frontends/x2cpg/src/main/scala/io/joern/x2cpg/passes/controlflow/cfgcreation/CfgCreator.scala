@@ -502,6 +502,7 @@ class CfgCreator(entryNode: Method, diffGraph: DiffGraphBuilder) {
     }
     val presenceConditionMapSerialized = presenceConditionMap.asJson.noSpaces
 //    node.presenceCondition(presenceConditionMapSerialized)
+    //TODO: This does nothing, but we should be fine just using the Ast values, as they should be the same as the cfg
     diffGraph.setNodeProperty(choiceNodeCfg.entryNode.get, presenceConditionMapSerialized, "PRESENCE_CONDITION")
 
     val diffGraphs = edgesFromFringeTo(choiceNodeCfg, leftCfg.entryNode) ++

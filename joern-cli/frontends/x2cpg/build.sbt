@@ -9,6 +9,8 @@ libraryDependencies ++= Seq(
   "com.michaelpollmeier" % "versionsort"  % Versions.versionSort,
   "org.apache.commons"   % "commons-exec" % Versions.commonsExec,
   /* End: AST Gen Dependencies */
+  "io.circe" %% "circe-generic" % Versions.circle,
+  "io.circe" %% "circe-parser" % Versions.circle,
   "net.freeutils"  % "jlhttp"             % Versions.jlhttp,
   "org.gradle"     % "gradle-tooling-api" % Versions.gradleTooling % Optional,
   "org.scalatest" %% "scalatest"          % Versions.scalatest     % Test
