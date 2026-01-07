@@ -26,7 +26,7 @@ class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPa
   override def runOnPart(diffGraph: DiffGraphBuilder, method: Method): Unit = {
     //    val bla = method._cfgOut.repeat(_.out("CFG"))()
     println(method.name)
-    diffGraph.setNodeProperty(method, "LANGUAGE", "HAllooooooooo")
+    diffGraph.setNodeProperty(method, "PRESENCE_CONDITION", "2")
     return
     //    val localDiff = Cpg.newDiffGraphBuilder
 

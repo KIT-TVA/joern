@@ -41,16 +41,24 @@ object DotSerializer {
 
   object Edge {
     def apply(src: StoredNode, dst: StoredNode, srcVisible: Boolean = true, label: String = "", edgeType: String = ""): Edge = {
-      val computedLabel = computeLabel(src, dst)
+      val computedLabel = label + computeLabel(src, dst, edgeType)
       new Edge(src, dst, srcVisible, computedLabel, edgeType)
     }
 
-    private def computeLabel(src: StoredNode, dst: StoredNode): String = {
+    private def computeLabel(src: StoredNode, dst: StoredNode, edgeType: String): String = {
       src.propertyOption[String]("PRESENCE_CONDITION") match {
         case Some(presenceConditionMapSerialized) =>
           val presenceConditionMap = decode[Map[String, String]](presenceConditionMapSerialized).getOrElse(Map.empty)
-          val edgeId = "VPDG" + dst.id().toString
-          presenceConditionMap.getOrElse(edgeId, "")
+
+          /*val edgeId = edgeType match {
+            case "AST" => "AST" + dst.property[Int]("ORDER").toString
+            case "CFG" => dst.id().toString
+            case "DDG" => "VPDG" + dst.id().toString
+            case _ => "" //TODO: CDG?
+          }
+
+          presenceConditionMap.getOrElse(edgeId, "")*/
+          presenceConditionMapSerialized
         case None => ""
       }
     }
