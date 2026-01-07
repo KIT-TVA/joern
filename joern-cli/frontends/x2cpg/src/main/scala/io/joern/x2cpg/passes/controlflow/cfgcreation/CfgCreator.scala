@@ -125,7 +125,7 @@ class CfgCreator(entryNode: Method, diffGraph: DiffGraphBuilder) {
       case _: Block =>
         cfgForChildren(node) ++ cfgForSingleNode(node.asInstanceOf[CfgNode])
       case _: Call | _: FieldIdentifier | _: Identifier | _: Literal | _: Block | _: Unknown =>
-        cfgForSingleNode(node.asInstanceOf[CfgNode]) ++ cfgForChildren(node)  
+        cfgForChildren(node) ++ cfgForSingleNode(node.asInstanceOf[CfgNode])
       case _ =>
         cfgForChildren(node)
     }
@@ -476,7 +476,6 @@ class CfgCreator(entryNode: Method, diffGraph: DiffGraphBuilder) {
     val choiceNodeCfg = cfgForSingleNode(node)
 //    val choiceNodeCfg = cfgForSingleNode(node.asInstanceOf[CfgNode])
     choiceNodeCfg
-    //TODO: this could be part of the problems:
     val leftCfg = node.traversal.out.collectAll[AstNode].order(1).headOption.map(cfgFor).getOrElse(Cfg.empty)
     val rightCfg = node.traversal.out.collectAll[AstNode].order(2).headOption.map(cfgFor).getOrElse(Cfg.empty)
 
@@ -502,8 +501,7 @@ class CfgCreator(entryNode: Method, diffGraph: DiffGraphBuilder) {
     }
     val presenceConditionMapSerialized = presenceConditionMap.asJson.noSpaces
 //    node.presenceCondition(presenceConditionMapSerialized)
-    //TODO: This does nothing, but we should be fine just using the Ast values, as they should be the same as the cfg
-    diffGraph.setNodeProperty(choiceNodeCfg.entryNode.get, presenceConditionMapSerialized, "PRESENCE_CONDITION")
+    diffGraph.setNodeProperty(choiceNodeCfg.entryNode.get, "PRESENCE_CONDITION", presenceConditionMapSerialized)
 
     val diffGraphs = edgesFromFringeTo(choiceNodeCfg, leftCfg.entryNode) ++
       edgesFromFringeTo(choiceNodeCfg, rightCfg.entryNode)

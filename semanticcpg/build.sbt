@@ -8,7 +8,9 @@ libraryDependencies ++= Seq(
   "org.json4s"             %% "json4s-native"     % Versions.json4s,
   "org.scala-lang.modules" %% "scala-xml"         % "2.2.0",
   "org.apache.commons"      % "commons-text"      % Versions.commonsText,
-  "org.scalatest"          %% "scalatest"         % Versions.scalatest % Test
+  "org.scalatest"          %% "scalatest"         % Versions.scalatest % Test,
+  "io.circe"               %% "circe-generic"     % Versions.circle,
+  "io.circe"               %% "circe-parser"      % Versions.circle,
 )
 
 Compile / doc / scalacOptions ++= Seq("-doc-title", "semanticcpg apidocs", "-doc-version", version.value)

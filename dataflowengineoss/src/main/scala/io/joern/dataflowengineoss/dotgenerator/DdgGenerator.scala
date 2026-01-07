@@ -85,7 +85,7 @@ class DdgGenerator {
   }
 
   private def expand(v: StoredNode)(implicit semantics: Semantics): Iterator[Edge] = {
-
+    //TODO: This probably messes with how we want to label the edges with presence conditions!
     val allInEdges = v
       .inE(EdgeTypes.REACHING_DEF)
       .map(x =>

@@ -571,8 +571,8 @@ class VAstCreator(
 
       val leftId = calculateAstNodeId(leftAst.root.get)
       var presenceConditionMap: Map[String, String] =
-        Map(leftId -> presenceCondition.toString)
-      //        Map("AST1" -> presenceCondition.toString)
+                Map("AST1" -> presenceCondition.toString)
+//        Map(leftId -> presenceCondition.toString)
 
       var presenceConditionEdges = Seq(AstEdge(choiceNode, leftAst.root.get))
       if (choiceStatement.size() == 4) {
@@ -592,11 +592,12 @@ class VAstCreator(
         if (leftId == rightId){
           return leftAst
         }
-        presenceConditionMap =  presenceConditionMap + (rightId-> negatedPresenceCondition.toString)
+//        presenceConditionMap =  presenceConditionMap + (rightId-> negatedPresenceCondition.toString)
         
-//        presenceConditionMap =  presenceConditionMap + ("AST2"-> negatedPresenceCondition.toString)
+        presenceConditionMap =  presenceConditionMap + ("AST2"-> negatedPresenceCondition.toString)
       }
       else{
+        //TODO: rename to fringe?
         presenceConditionMap = presenceConditionMap + ("UNKNOWN" -> presenceCondition.not().toString)
       }
       val presenceConditionMapSerialized = presenceConditionMap.asJson.noSpaces

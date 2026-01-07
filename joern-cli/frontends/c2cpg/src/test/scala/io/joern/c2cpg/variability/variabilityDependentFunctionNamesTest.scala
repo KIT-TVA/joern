@@ -13,6 +13,7 @@ import io.joern.x2cpg.X2Cpg.newEmptyCpg
 import io.joern.x2cpg.passes.frontend.MetaDataPass
 import io.joern.x2cpg.testfixtures.Code2CpgFixture
 import io.shiftleft.codepropertygraph.Cpg
+import io.shiftleft.codepropertygraph.generated.nodes.StoredNode
 import io.shiftleft.codepropertygraph.generated.{DiffGraphBuilder, Languages, nodes}
 import io.shiftleft.semanticcpg.dotgenerator.{DotAstGenerator, DotCfgGenerator}
 import superc.SuperC
@@ -49,11 +50,14 @@ class variabilityDependentFunctionNamesTest extends C2CpgSuite(withOssDataflow =
   flatgraph.DiffGraphApplier.applyDiff(superCpg.graph, diffGraph)
   X2Cpg.applyDefaultOverlays(superCpg)
 
-  new ReachingDefPass(superCpg).createAndApply()
+//  new ReachingDefPass(superCpg).createAndApply()
   new PdgPresenceConditionAnnotationPass(superCpg).createAndApply()
+  val test = superCpg.graph.allNodes.toList.map(_.asInstanceOf[StoredNode])(13).properties
+//  val test = superCpg.graph.allNodes.toList.map(_.asInstanceOf[StoredNode]).map(_.properties)
+  println(test)
   val superCTraversal = superCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
-//  val superCAstDotString = DotCpg14Generator.toDotCpg14(superCTraversal).mkString
-  val superCAstDotString = DotAstGenerator.dotAst(superCTraversal).mkString
+  val superCAstDotString = DotCpg14Generator.toDotCpg14(superCTraversal).mkString
+//  val superCAstDotString = DotAstGenerator.dotAst(superCTraversal).mkString
 //  val superCAstDotString = DotCfgGenerator.dotCfg(superCTraversal).mkString
 //  val superCAstDotString = DotDdgGenerator.toDotDdg(superCTraversal).mkString
 
