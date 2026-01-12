@@ -41,8 +41,16 @@ object DotSerializer {
 
   object Edge {
     def apply(src: StoredNode, dst: StoredNode, srcVisible: Boolean = true, label: String = "", edgeType: String = ""): Edge = {
-      val computedLabel = label + computeLabel(src, dst, edgeType)
-      new Edge(src, dst, srcVisible, computedLabel, edgeType)
+      val presenceConditionLabel = computeLabel(src, dst, edgeType)
+      val newLabel = if (label.nonEmpty && presenceConditionLabel.nonEmpty) {
+        label + "\n" + presenceConditionLabel
+      }
+      else {
+        label + presenceConditionLabel
+      }
+
+      new Edge(src, dst, srcVisible, newLabel, edgeType)
+
     }
 
     private def computeLabel(src: StoredNode, dst: StoredNode, edgeType: String): String = {
@@ -50,15 +58,13 @@ object DotSerializer {
         case Some(presenceConditionMapSerialized) =>
           val presenceConditionMap = decode[Map[String, String]](presenceConditionMapSerialized).getOrElse(Map.empty)
 
-          /*val edgeId = edgeType match {
-            case "AST" => "AST" + dst.property[Int]("ORDER").toString
-            case "CFG" => dst.id().toString
-            case "DDG" => "VPDG" + dst.id().toString
-            case _ => "" //TODO: CDG?
+          val edgeId = edgeType match {
+            case "AST" => "AST" + dst.property[Integer]("ORDER").toString
+            case "CFG" => "CFG" + dst.id().toString
+            case "DDG" | "CDG" => "PDG" + dst.id().toString
+            case _ => ""
           }
-
-          presenceConditionMap.getOrElse(edgeId, "")*/
-          presenceConditionMapSerialized
+          presenceConditionMap.getOrElse(edgeId, "")
         case None => ""
       }
     }

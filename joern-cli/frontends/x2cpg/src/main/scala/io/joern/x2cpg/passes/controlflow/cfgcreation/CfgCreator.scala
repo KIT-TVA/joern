@@ -484,7 +484,7 @@ class CfgCreator(entryNode: Method, diffGraph: DiffGraphBuilder) {
     var presenceConditionMap: Map[String, String] = decode[Map[String, String]](jsonString).getOrElse(Map.empty)
 
     def calculateStoredNodeId(node: StoredNode): String = {
-      node.id().toString
+      "CFG" + node.id().toString
     }
 
     // We need to do this, because the AST children of choice nodes are not necessarily also the CFG children!

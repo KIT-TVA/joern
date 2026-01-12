@@ -71,12 +71,6 @@ class VAstCreator(
   )
 
 
-  def superC2JoernGraph(joernAST: Int): Cpg = {
-    //joernAST.
-    //joernAST.getLocation
-    //TODO: return actual cpg
-    Cpg()
-  }
 
   override def createAst(): DiffGraphBuilder = {
     //TODO: filecontent
