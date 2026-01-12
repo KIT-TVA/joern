@@ -4,7 +4,7 @@ import flatgraph.{Edge, GNode}
 import io.circe.parser.decode
 import io.circe.syntax.*
 import io.shiftleft.codepropertygraph.generated.Cpg
-import io.shiftleft.codepropertygraph.generated.nodes.{ControlStructure, Method, StoredNode}
+import io.shiftleft.codepropertygraph.generated.nodes.{ControlStructure, Method, Call, StoredNode}
 import io.shiftleft.passes.ForkJoinParallelCpgPass
 import io.shiftleft.semanticcpg.language.*
 
@@ -19,13 +19,11 @@ import io.shiftleft.semanticcpg.language.*
 class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPass[Method](cpg) {
 
   override def generateParts(): Array[Method] = {
-    cpg.method.toArray
+    val arr = cpg.method.toArray.toList
+    Array(arr(0))
   }
 
   override def runOnPart(diffGraph: DiffGraphBuilder, method: Method): Unit = {
-    println(method.name)
-
-
     def getPresenceCondition(src: GNode, dst: GNode): String = {
       def calculateStoredNodeId(node: StoredNode): String = "CFG" + node.id().toString
 
@@ -47,14 +45,19 @@ class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPa
     }
 
 
+
     def presenceConditionBetween(src: GNode, dst: GNode): String = {
       // node we are processing on this path -> (collected presence conditions on this path, visited nodes on this path)
-      var workingSet: Map[GNode, (String, Set[GNode])] = Map((src, ("", Set())))
+      var workingSet: Seq[(GNode, (String, Set[GNode]))] = Seq((src, ("", Set())))
       var presenceConditions: Seq[String] = Seq()
+
+      if(src == dst){
+        return ""
+      }
 
       def expandNode(arg: (GNode, (String, Set[GNode]))): Seq[(GNode, (String, Set[GNode]))] = {
         val (node: GNode, (presenceCondition: String, visitedNodes: Set[GNode])) = arg
-        val successorNodes: Seq[GNode] = node.out("CFG").toSeq.filter(!visitedNodes.contains(_))
+        val successorNodes: Seq[GNode] = node.out("CFG").toSeq.filter(!visitedNodes.contains(_)).filter(_ != node)
 
         successorNodes.map { succNode =>
           val newPresenceCondition = getPresenceCondition(node, succNode) match {
@@ -71,9 +74,13 @@ class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPa
           }
         }.collect { case Some(v) => v }
       }
-
+      println()
       while (workingSet.nonEmpty) {
-        workingSet = workingSet.flatMap(expandNode)
+        val newWorkingSet = workingSet.flatMap(expandNode)
+        workingSet = newWorkingSet
+        if (src.isInstanceOf[Method]){
+          println(workingSet)
+        }
       }
       if (presenceConditions.size > 1) {
         presenceConditions.map("(" + _ + ")").mkString(" || ")
@@ -112,6 +119,9 @@ class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPa
           edges.map { case (edge, presenceCondition) => "PDG" + edge.dst.id().toString -> presenceCondition }.toMap
         val newPresenceConditionMapSerialized = newPresenceConditionMap.asJson.noSpaces
         diffGraph.setNodeProperty(src, "PRESENCE_CONDITION", newPresenceConditionMapSerialized)
+        if(method.name == "foo"){
+          println(src.toString + "      " + newPresenceConditionMapSerialized)
+        }
       }
   }
 
