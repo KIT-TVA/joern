@@ -60,7 +60,8 @@ class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPa
         successorNodes.map { succNode =>
           val newPresenceCondition = getPresenceCondition(node, succNode) match {
             case "" => presenceCondition
-            case value: String if presenceCondition != "" => presenceCondition + " && " + value
+            case value: String if value == presenceCondition => value
+            case value: String if presenceCondition.nonEmpty => "(" + presenceCondition + ")" + " AND (" + value + ")"
             case value: String => value
           }
           if (succNode == dst) {
@@ -73,16 +74,16 @@ class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPa
         }.collect { case Some(v) => v }
       }
 
-      println()
       while (workingSet.nonEmpty) {
         val newWorkingSet = workingSet.flatMap(expandNode)
         workingSet = newWorkingSet
-        if (src.isInstanceOf[Method]) {
+        /*if (src.isInstanceOf[Method]){
           println(workingSet)
-        }
+        }*/
       }
+      presenceConditions = presenceConditions.filter(_.nonEmpty).distinct
       if (presenceConditions.size > 1) {
-        presenceConditions.map("(" + _ + ")").mkString(" || ")
+        presenceConditions.map("(" + _ + ")").mkString(" OR ")
       }
       else {
         presenceConditions.mkString
@@ -101,7 +102,7 @@ class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPa
           p1
         }
         else {
-          "(" + p1 + ") && (" + p2 + ")"
+          "(" + p1 + ") AND (" + p2 + ")"
         }
       }
 
@@ -118,9 +119,9 @@ class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPa
           edges.map { case (edge, presenceCondition) => "PDG" + edge.dst.id().toString -> presenceCondition }.toMap
         val newPresenceConditionMapSerialized = newPresenceConditionMap.asJson.noSpaces
         diffGraph.setNodeProperty(src, "PRESENCE_CONDITION", newPresenceConditionMapSerialized)
-        if (method.name == "foo") {
-          println(src.toString + "      " + newPresenceConditionMapSerialized)
-        }
+        /*        if(method.name == "foo"){
+                  println(src.toString + "      " + newPresenceConditionMapSerialized)
+                }*/
       }
   }
 
