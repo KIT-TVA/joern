@@ -4,7 +4,7 @@ import flatgraph.{Edge, GNode}
 import io.circe.parser.decode
 import io.circe.syntax.*
 import io.shiftleft.codepropertygraph.generated.Cpg
-import io.shiftleft.codepropertygraph.generated.nodes.{ControlStructure, Method, Call, StoredNode}
+import io.shiftleft.codepropertygraph.generated.nodes.{ControlStructure, Method, StoredNode}
 import io.shiftleft.passes.ForkJoinParallelCpgPass
 import io.shiftleft.semanticcpg.language.*
 
@@ -19,8 +19,7 @@ import io.shiftleft.semanticcpg.language.*
 class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPass[Method](cpg) {
 
   override def generateParts(): Array[Method] = {
-    val arr = cpg.method.toArray.toList
-    Array(arr(0))
+    cpg.method.toArray
   }
 
   override def runOnPart(diffGraph: DiffGraphBuilder, method: Method): Unit = {
@@ -45,13 +44,12 @@ class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPa
     }
 
 
-
     def presenceConditionBetween(src: GNode, dst: GNode): String = {
       // node we are processing on this path -> (collected presence conditions on this path, visited nodes on this path)
       var workingSet: Seq[(GNode, (String, Set[GNode]))] = Seq((src, ("", Set())))
       var presenceConditions: Seq[String] = Seq()
 
-      if(src == dst){
+      if (src == dst) {
         return ""
       }
 
@@ -74,11 +72,12 @@ class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPa
           }
         }.collect { case Some(v) => v }
       }
+
       println()
       while (workingSet.nonEmpty) {
         val newWorkingSet = workingSet.flatMap(expandNode)
         workingSet = newWorkingSet
-        if (src.isInstanceOf[Method]){
+        if (src.isInstanceOf[Method]) {
           println(workingSet)
         }
       }
@@ -119,7 +118,7 @@ class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPa
           edges.map { case (edge, presenceCondition) => "PDG" + edge.dst.id().toString -> presenceCondition }.toMap
         val newPresenceConditionMapSerialized = newPresenceConditionMap.asJson.noSpaces
         diffGraph.setNodeProperty(src, "PRESENCE_CONDITION", newPresenceConditionMapSerialized)
-        if(method.name == "foo"){
+        if (method.name == "foo") {
           println(src.toString + "      " + newPresenceConditionMapSerialized)
         }
       }
