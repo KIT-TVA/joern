@@ -327,7 +327,6 @@ class VAstCreator(
     parameterInNode(parentNode, name, code, index, false, "BY_VALUE", returnType)
   }
 
-  //TODO: Think about where Gnode and where Node
   def getChildren(node: Node): Seq[Node] = {
     (0 until node.size()).map(node.get).collect { case g: Node => g }
   }
@@ -425,23 +424,22 @@ class VAstCreator(
 
   }
 
+  //TODO: This could be more efficient if we used caching
   override protected def code(node: Node): String = {
-    node.getName match {
-      case "CompoundStatement" | "test" =>
-        println("sadf")
-      case _ =>
-    }
     val nodes = collectAllNodes(node)
     nodes.flatMap { n =>
 
+      val nodePrefix = n.getName match {
+        case "ReturnStatement" => "return"
+        case _ => ""
+      }
       (0 until n.size()).map { i =>
         n.get(i) match {
-          case code: String => Some(code)
-          case _ => None
+          case code: String => nodePrefix + " " + code
+          case _ => nodePrefix 
         }
       }
-    }.collect { case Some(code): Some[String] => code + " " }.mkString
-    //TODO: Decide wether we need this implementation, since it has pretty bad performance
+    }.mkString(" ")
   }
 
 
