@@ -33,17 +33,17 @@ class DdgGenerator {
     }
 
     val ddgNodes = visibleNodes
-      .filter(node => allIdsReferencedByEdges.contains(node.id))
-      .map(surroundingCall)
-      .filterNot(node => node.isInstanceOf[Call] && isGenericMemberAccessName(node.asInstanceOf[Call].name))
+//      .filter(node => allIdsReferencedByEdges.contains(node.id))
+//      .map(surroundingCall)
+//      .filterNot(node => node.isInstanceOf[Call] && isGenericMemberAccessName(node.asInstanceOf[Call].name))
 
     val ddgEdges = edges.flatten
-      .map { edge =>
-        edge.copy(src = surroundingCall(edge.src), dst = surroundingCall(edge.dst))
-      }
-      .filter(e => e.src != e.dst)
-      .filterNot(e => e.dst.isInstanceOf[Call] && isGenericMemberAccessName(e.dst.asInstanceOf[Call].name))
-      .filterNot(e => e.src.isInstanceOf[Call] && isGenericMemberAccessName(e.src.asInstanceOf[Call].name))
+      //.map { edge =>
+      //  edge.copy(src = surroundingCall(edge.src), dst = surroundingCall(edge.dst))
+      //}
+      //.filter(e => e.src != e.dst)
+      //.filterNot(e => e.dst.isInstanceOf[Call] && isGenericMemberAccessName(e.dst.asInstanceOf[Call].name))
+      //.filterNot(e => e.src.isInstanceOf[Call] && isGenericMemberAccessName(e.src.asInstanceOf[Call].name))
       .distinct
 
     edgeCache.clear()
@@ -57,10 +57,10 @@ class DdgGenerator {
     }
   }
 
-  private def shouldBeDisplayed(v: StoredNode): Boolean = !(
+  private def shouldBeDisplayed(v: StoredNode): Boolean = true /*!(
     v.isInstanceOf[ControlStructure] ||
       v.isInstanceOf[JumpTarget]
-  ) || v.properties.contains("PRESENCE_CONDITION")
+  ) || v.properties.contains("PRESENCE_CONDITION")*/
 
   private def inEdgesToDisplay(dstNode: StoredNode, visited: List[StoredNode] = List())(implicit
     semantics: Semantics
