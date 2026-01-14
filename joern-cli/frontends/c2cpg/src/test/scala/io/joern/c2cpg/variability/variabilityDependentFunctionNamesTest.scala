@@ -24,7 +24,7 @@ class variabilityDependentFunctionNamesTest extends C2CpgSuite(withOssDataflow =
   implicit val semantics: Semantics = DefaultSemantics()
   val cCode =
     """
-    int main(int a){
+    void main(int a){
     #ifdef macro
     foo
     #else
