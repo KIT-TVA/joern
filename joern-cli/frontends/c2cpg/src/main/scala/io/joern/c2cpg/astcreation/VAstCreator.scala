@@ -6,12 +6,11 @@ import io.joern.x2cpg.datastructures.VariableScopeManager
 import io.joern.x2cpg.{Ast, AstCreatorBase, AstEdge, ValidationMode}
 import io.shiftleft.codepropertygraph.generated.*
 import io.shiftleft.codepropertygraph.generated.nodes.*
-import org.eclipse.cdt.core.dom.ast.IASTBinaryExpression
 import org.slf4j.{Logger, LoggerFactory}
 import superc.core.PresenceConditionManager
 import superc.core.PresenceConditionManager.PresenceCondition
 import superc.core.Syntax.Text
-import xtc.tree.{GNode, Location, Node, Token}
+import xtc.tree.{GNode, Location, Node}
 
 import scala.collection.mutable.ListBuffer
 
@@ -35,7 +34,7 @@ class VAstCreator(
     ">" -> Operators.greaterThan,
     "*" -> Operators.multiplication,
     "/" -> Operators.division,
-    "%"-> Operators.modulo,
+    "%" -> Operators.modulo,
     "+" -> Operators.addition,
     "-" -> Operators.subtraction,
     "=" -> Operators.assignment,
@@ -71,98 +70,103 @@ class VAstCreator(
   )
 
 
-
   override def createAst(): DiffGraphBuilder = {
     //TODO: filecontent
     val fileNode = NewFile().name("test").order(0)
     //TODO: remove this
     // val test = astForIf(superCAst.getNode(0).getNode(0).getNode(1).getNode(1).getNode(1).getNode(0).getNode(1))
-    val ast = Ast(fileNode).withChild(astForXtcNode(superCAst))
+    val ast = Ast(fileNode).withChild(astForXtcTree(superCAst))
     Ast.storeInDiffGraph(ast, diffGraph)
     //    diffGraph.addEdge()
     scope.createVariableReferenceLinks(diffGraph, filename)
     diffGraph
   }
 
-  def astForXtcNode(node: Node): Ast = {
+  def astForXtcTree(node: Node): Ast = {
     val diffGraph: DiffGraphBuilder = Cpg.newDiffGraphBuilder
     //    val testI = convertXTCNodeToJoern(node.getNode(0).getNode(0).getNode(1).getNode(1).getNode(1).getNode(0).getNode(1))
-    val joernNode = convertXTCNodeToJoern(node.getNode(0).getNode(0).getNode(1))
+    val joernNode = astForXtcNoce(node.getNode(0).getNode(0).getNode(1))
     //implicit val validationMode: ValidationMode = ValidationMode.Disabled
     //Ast(joernNode)
-    joernNode
+    joernNode.head
   }
 
   //TODO: Theoretisch können überall choice nodes sein, auch in params etc.
-  def convertXTCNodeToJoern(node: Node): Ast = {
-    node match {
-      case conditional: GNode if conditional.hasName("Conditional") => astForChoiceNode(conditional)
-      case declaration: GNode if declaration.hasName("Declaration") => convertXTCNodeToJoern(declaration.getNode(0)) //TODO ?
-      case declarationList: GNode if declarationList.hasName("DeclaringList") => astForDeclarationList(declarationList)
-      case simpleDeclarator: GNode if simpleDeclarator.hasName("SimpleDeclarator") => astForSimpleDeclaration(simpleDeclarator)
-      case compoundStatement: GNode if compoundStatement.hasName("CompoundStatement") =>
-        astForBlockStatement(compoundStatement, blockNode(compoundStatement))
-      case funcDef: GNode if funcDef.hasName("FunctionDefinition") => astForFunctionDefinition(funcDef)
-      case text: Text[_] if text.hasName("superc.core.Syntax$Text") => astForLiteral(text)
-      case identifier: GNode if identifier.hasName("PrimaryIdentifier") => astForIdentifier(identifier)
-      case stringLiteralList: GNode if stringLiteralList.hasName("StringLiteralList") =>
-        astForStringLiteralList(stringLiteralList)
-      case relExpression: GNode if relExpression.hasName("RelationalExpression") => astForRelationalExpression(relExpression)
+  def astForXtcNoce(node: Node): Seq[Ast] = {
+    /*node match {
+      case text: Text[_]
+    }*/
+    node.getName match {
+      case "Conditional" => astForChoiceNode(node)
+      case "Declaration" => astForXtcNoce(node.getNode(0)) //TODO ?
+      case "DeclaringList" => astsForDeclarationList(node)
+      case "SimpleDeclarator" =>
+        Seq(astForSimpleDeclaration(node))
+      case "CompoundStatement" =>
+        Seq(astForBlockStatement(node, blockNode(node)))
+      case "FunctionDefinition" => Seq(astForFunctionDefinition(node))
+      case "ReturnStatement" =>
+        Seq(astForReturnStatement(node))
+      case "superc.core.Syntax$Text" => Seq(astForLiteral(node))
+      //      case "superc.core.Syntax$Text" if node.getClass == Text[_]  => Seq(astForLiteral(node))
+      case "PrimaryIdentifier" => Seq(astForIdentifier(node))
+      case "StringLiteralList" =>
+        astsForStringLiteralList(node)
+      case "RelationalExpression" | "AdditiveExpression" =>
+        Seq(astForExpression(node))
       //      case operator: GNode if operator.hasName("superc.core.Syntax$Language") => astForOperator(operator)
-      case selectionStatement: GNode if selectionStatement.hasName("SelectionStatement") =>
-        selectionStatement.getNode(0).toString match {
-          case "if" => astForIf(selectionStatement)
-          case _ => Ast()
+      case "SelectionStatement" =>
+        node.getNode(0).toString match {
+          case "if" => Seq(astForIf(node))
+          case _ => Seq(Ast())
         }
-      case expressionStatement: GNode if expressionStatement.hasName("ExpressionStatement") =>
-        expressionStatement.getNode(0).getName match {
-          case "FunctionCall" => astForFunctionCall(expressionStatement)
-          case _ => Ast()
+      case "ExpressionStatement" =>
+        node.getNode(0).getName match {
+          case "FunctionCall" => Seq(astForFunctionCall(node))
+          case _ => Seq(Ast())
         }
-      case node => Ast() //getChildren(node).map(convertXTCNodeToJoern).head
+      case node => Seq(Ast()) //getChildren(node).map(convertXTCNodeToJoern).head
     }
   }
 
 
-/*  Declaration(
-    DeclaringList(
-    superc.core.Syntax$Language("int"),
+  /*  Declaration(
+      DeclaringList(
+      superc.core.Syntax$Language("int"),
 
-      SimpleDeclarator(superc.core.Syntax$Text("b")),
+        SimpleDeclarator(superc.core.Syntax$Text("b")),
 
-      AssemblyExpressionOpt(),
+        AssemblyExpressionOpt(),
 
-      AttributeSpecifierListOpt(),
+        AttributeSpecifierListOpt(),
 
-      InitializerOpt(Initializer(superc.core.Syntax$Text("0")))
+        InitializerOpt(Initializer(superc.core.Syntax$Text("0")))
+      )
     )
-  )
-  */
+    */
 
 
-/*  DeclaringList(
-    DeclaringList(superc.core.Syntax$Language("int"),
+  /*  DeclaringList(
+      DeclaringList(superc.core.Syntax$Language("int"),
 
-      SimpleDeclarator(superc.core.Syntax$Text("a")),
+        SimpleDeclarator(superc.core.Syntax$Text("a")),
+
+        AssemblyExpressionOpt(),
+
+        AttributeSpecifierListOpt(),
+
+        InitializerOpt()
+      ),
+
+      AttributeSpecifierListOpt(),
+
+      SimpleDeclarator(superc.core.Syntax$Text("x")),
 
       AssemblyExpressionOpt(),
 
       AttributeSpecifierListOpt(),
 
-      InitializerOpt()
-    ),
-
-    AttributeSpecifierListOpt(),
-
-    SimpleDeclarator(superc.core.Syntax$Text("x")),
-
-    AssemblyExpressionOpt(),
-
-    AttributeSpecifierListOpt(),
-
-    InitializerOpt(Initializer(superc.core.Syntax$Text("5"))))*/
-
-
+      InitializerOpt(Initializer(superc.core.Syntax$Text("5"))))*/
 
 
   /*DeclaringList(superc.core.Syntax$Language("int"),
@@ -177,7 +181,7 @@ class VAstCreator(
 
  InitializerOpt())*/
 
-  private def astForDeclarationList(declaration: Node): Ast = {
+  private def astsForDeclarationList(declaration: Node): Seq[Ast] = {
     // We do not support int x, y = 5;
     // Todo: typedefs, part of class etc
     val childNodes = getChildren(declaration)
@@ -186,30 +190,30 @@ class VAstCreator(
     val declarator = childNodes(1)
     val assemblyExpressionOpt = childNodes(2)
     val attributeSpecifierListOpt = childNodes(3)
-    val InitializerOpt = childNodes(4)
+    val initializerOpt = childNodes(4)
 
     val node = localNode(declarator, declarator.getName, code(declarator), typeNode.toString)
 
     val declAst = Ast(node)
     var initAst = Ast()
-    if(InitializerOpt.size() > 0) {
-      initAst = astForInitializer(declaration, InitializerOpt.getNode(0))
+    if (initializerOpt.size() > 0) {
+      initAst = astForInitializer(declaration, initializerOpt.getNode(0))
     }
     //TODO:
-//    Seq(Ast(node), initAst)
+    //    Seq(Ast(node), initAst)
 
-    initAst
+    Seq(declAst, initAst)
   }
 
   private def astForSimpleDeclaration(simpleDeclaration: Node): Ast = {
     astForIdentifier(simpleDeclaration)
-//    convertXTCNodeToJoern(simpleDeclaration.getNode(0))
+    //    convertXTCNodeToJoern(simpleDeclaration.getNode(0))
   }
 
   private def astForInitializer(declarator: Node, init: Node): Ast = {
     init match {
       case equalInit: Node if equalInit.hasName("Initializer") =>
-        astForEqualsInitializer(declarator, convertXTCNodeToJoern(declarator.getNode(1)), convertXTCNodeToJoern(equalInit.getNode(0)))
+        astForEqualsInitializer(declarator, astForXtcNoce(declarator.getNode(1)).head, astForXtcNoce(equalInit.getNode(0)).head)
       case _ => Ast()
     }
   }
@@ -223,12 +227,32 @@ class VAstCreator(
       DispatchTypes.STATIC_DISPATCH,
       None,
       Some(Defines.Void)
-//      Some(registerType(Defines.Void))
+      //      Some(registerType(Defines.Void))
     )
     callAst(assignmentCallNode, List(leftAst, rightAst))
   }
 
 
+
+  /*  private def astForReturnStatement(ret: IASTReturnStatement): Ast = {
+    val cpgReturn = returnNode(ret, code(ret))
+    nullSafeAst(ret.getReturnValue) match {
+      case retAst if retAst.root.isDefined => Ast(cpgReturn).withChild(retAst).withArgEdge(cpgReturn, retAst.root.get)
+      case _                               => Ast(cpgReturn)
+    }
+  }*/
+
+  private def astForReturnStatement(returnStatement: Node): Ast = {
+    val cpgReturn = returnNode(returnStatement, code(returnStatement))
+    var arg = Ast()
+    if (returnStatement.size() > 0) {
+      arg = astForXtcNoce(returnStatement.getNode(0)).head
+    }
+    arg match {
+      case retAst if retAst.root.isDefined => Ast(cpgReturn).withChild(retAst).withArgEdge(cpgReturn, retAst.root.get)
+      case _ => Ast(cpgReturn)
+    }
+  }
 
   private def astForIdentifier(identifier: Node): Ast = {
     //TODO: Im Eclipse Frontend wird noch maybeMethodRefForIdentifier verwendet, nachschauen was bei uns das equivalent ist
@@ -238,35 +262,37 @@ class VAstCreator(
     Ast(node)
   }
 
-  private def astForRelationalExpression(relExp: Node): Ast = {
+  private def astForExpression(relExp: Node): Ast = {
     val op = OperatorMap.getOrElse(relExp.getNode(1).getString(0), Defines.OperatorUnknown)
     //TODO registerType?       callNode(relExp, code(relExp), op, op, DispatchTypes.STATIC_DISPATCH, None, Some(registerType(Defines.Any)))
     val callNode_ =
       callNode(relExp, code(relExp), op, op, DispatchTypes.STATIC_DISPATCH, None, Some(Defines.Any))
-    val left = convertXTCNodeToJoern(relExp.getNode(0))
-    val right = convertXTCNodeToJoern(relExp.getNode(2))
+    val left = astForXtcNoce(relExp.getNode(0)).head
+    val right = astForXtcNoce(relExp.getNode(2)).head
     callAst(callNode_, List(left, right))
   }
 
-  private def astForStringLiteralList(stringLitList: Node): Ast = {
-    if (stringLitList.size == 1) {
-      convertXTCNodeToJoern(stringLitList.getNode(0))
-    }
-    else {
-      //TODO: Handle this case correctly, how do we even get into this case?
-      val literals = getChildren(stringLitList).map(convertXTCNodeToJoern)
-      Ast()
-      /* Ast(
-        nodes = Seq(choiceNode) ++ leftAst.nodes ++ rightAst.nodes,
-        edges = leftAst.edges ++ rightAst.edges,
-        conditionEdges = leftAst.conditionEdges ++ rightAst.conditionEdges ++ presenceConditionEdges,
-        argEdges = leftAst.argEdges ++ rightAst.argEdges,
-        receiverEdges = leftAst.receiverEdges ++ rightAst.receiverEdges,
-        refEdges = leftAst.refEdges ++ rightAst.refEdges,
-        bindsEdges = leftAst.bindsEdges ++ rightAst.bindsEdges,
-        captureEdges = leftAst.captureEdges ++ rightAst.captureEdges
-      )*/
-    }
+
+  private def astsForStringLiteralList(stringLitList: Node): Seq[Ast] = {
+    getChildren(stringLitList).flatMap(astForXtcNoce)
+    /* if (stringLitList.size == 1) {
+       convertXTCNodeToJoern(stringLitList.getNode(0)).head
+     }
+     else {
+       //TODO: Handle this case correctly, how do we even get into this case?
+       val literals = getChildren(stringLitList).map(convertXTCNodeToJoern)
+       Ast()
+       /* Ast(
+         nodes = Seq(choiceNode) ++ leftAst.nodes ++ rightAst.nodes,
+         edges = leftAst.edges ++ rightAst.edges,
+         conditionEdges = leftAst.conditionEdges ++ rightAst.conditionEdges ++ presenceConditionEdges,
+         argEdges = leftAst.argEdges ++ rightAst.argEdges,
+         receiverEdges = leftAst.receiverEdges ++ rightAst.receiverEdges,
+         refEdges = leftAst.refEdges ++ rightAst.refEdges,
+         bindsEdges = leftAst.bindsEdges ++ rightAst.bindsEdges,
+         captureEdges = leftAst.captureEdges ++ rightAst.captureEdges
+       )*/
+     }*/
   }
 
   // CompoundStatement(LocalLabelDeclarationListOpt(), DeclarationOrStatementList(...))
@@ -280,7 +306,7 @@ class VAstCreator(
       .columnNumber(blockColumn)
     //.typeFullName(registerType(Defines.Void))
     //scope.pushNewBlockScope(node)
-    val childAsts = getChildren(blockStmt.getNode(1)).map(convertXTCNodeToJoern).toList // blockStmt.getStatements.flatMap(astsForStatement).toList
+    val childAsts = getChildren(blockStmt.getNode(1)).flatMap(astForXtcNoce).toList // blockStmt.getStatements.flatMap(astsForStatement).toList
     //    scope.popScope()
     blockAst(node, childAsts)
   }
@@ -400,16 +426,11 @@ class VAstCreator(
   }
 
   override protected def code(node: Node): String = {
-
-   /* if (node.hasName("ExpressionStatement") && node.getNode(0).hasName("FunctionCall")) {
-      val nameNode = node.getNode(0).getNode(0)
-      if (isChoiceNode(nameNode)) {
-        val argNodes = node.getNode(0).getNode(1)
-        val argsCode = code(argNodes)
-        return getChildren(nameNode).map(code(_) + " " + argsCode).mkString(" ")
-      }
-    }*/
-
+    node.getName match {
+      case "CompoundStatement" | "test" =>
+        println("sadf")
+      case _ =>
+    }
     val nodes = collectAllNodes(node)
     nodes.flatMap { n =>
 
@@ -424,16 +445,19 @@ class VAstCreator(
   }
 
 
-  private def astForLiteral(literal: Text[?]): Ast = {
-    val codeString = code(literal)
-    val tpe = literal.tag.toString //TODO: registerType(safeGetType(lit.getExpressionType)) todo:token
-    if (codeString == Defines.This) {
-      val thisIdentifier = identifierNode(literal, codeString, codeString, tpe)
-      // TODO: scope.addVariableReference(codeString, thisIdentifier, tpe, EvaluationStrategies.BY_SHARING)
-      Ast(thisIdentifier)
-    } else {
-      Ast(literalNode(literal, codeString, tpe))
+  private def astForLiteral(literal: Node): Ast = {
+    literal match {
+      case lit: Text[_] => val codeString = code(literal)
+        val tpe = lit.tag.toString //TODO: registerType(safeGetType(lit.getExpressionType)) todo:token
+        if (codeString == Defines.This) {
+          val thisIdentifier = identifierNode(lit, codeString, codeString, tpe)
+          // TODO: scope.addVariableReference(codeString, thisIdentifier, tpe, EvaluationStrategies.BY_SHARING)
+          Ast(thisIdentifier)
+        } else {
+          Ast(literalNode(lit, codeString, tpe))
+        }
     }
+
   }
 
   private def isChoiceNode(node: Node): Boolean = {
@@ -457,7 +481,7 @@ class VAstCreator(
         expressionStatement.getNode(0).set(0, leftNameNode)
         choiceNode.add(1, expressionStatement)
 
-        if(choiceNode.size == 4){
+        if (choiceNode.size == 4) {
           val cloner = new Cloner()
           val clonedExpressionStatement = cloner.deepClone(expressionStatement)
           val rightNameNode = choiceNode.remove(3)
@@ -465,7 +489,7 @@ class VAstCreator(
           choiceNode.add(3, clonedExpressionStatement)
 
         }
-        convertXTCNodeToJoern(choiceNode)
+        astForXtcNoce(choiceNode).head
       }
       // If the name node is not a choice node we can easily translate it.
       case _ =>
@@ -475,8 +499,8 @@ class VAstCreator(
           callNode(expressionStatement, code(expressionStatement), name, name, dispatchType, Some(""), Some("registerType(callTypeFullName)"))
         //TODO: Hier ist das Problem, dass die StringLiteralList nochmal potenziell in einem conditional ist, das heißt wir sollten die convert Funktion allgemein verändern!
         val args: Seq[Ast] = getChildren(expressionStatement.getNode(0).getNode(1)).flatMap {
-          case stringLiteralList: Node if stringLiteralList.hasName("StringLiteralList") => getChildren(stringLiteralList).map(convertXTCNodeToJoern)
-          case node: Node => Seq(convertXTCNodeToJoern(node))
+          case stringLiteralList: Node if stringLiteralList.hasName("StringLiteralList") => getChildren(stringLiteralList).flatMap(astForXtcNoce)
+          case node: Node => astForXtcNoce(node)
         } //.map(convertXTCNodeToJoern)
         createCallAst(callCpgNode, args)
 
@@ -497,7 +521,7 @@ class VAstCreator(
     //TODO: COde machen wir indem wir in order über die child nodes drüber gehen und da jeweils code() aufrufen (aber diese code funktion müssen wir auch noch schreiben)
     //    val methodBlockNode_ = NewBlock()
     //val blockAst_ : Ast = blockAst(methodBlockNode_, List(): List[Ast])
-    val blockAst_ : Ast = convertXTCNodeToJoern(funcDef.getNode(1))
+    val blockAst_ : Ast = astForXtcNoce(funcDef.getNode(1)).head
     val methodBlockNode = blockNode(funcDef)
     val methodNode_ = NewMethod()
       .name(name)
@@ -530,10 +554,10 @@ class VAstCreator(
 
   private def astForIf(ifStmt: Node): Ast = {
     val ifNode = controlStructureNode(ifStmt, ControlStructureTypes.IF, code(ifStmt))
-    val condAst = convertXTCNodeToJoern(ifStmt.getNode(1))
-    val thenAst = convertXTCNodeToJoern(ifStmt.getNode(2))
+    val condAst = astForXtcNoce(ifStmt.getNode(1)).head
+    val thenAst = astForXtcNoce(ifStmt.getNode(2)).head
     val elseAst = ifStmt.size match {
-      case 4 => convertXTCNodeToJoern(ifStmt.getNode(3))
+      case 4 => astForXtcNoce(ifStmt.getNode(3)).head
       case _ => Ast()
     }
     controlStructureAst(ifNode, Option(condAst), Seq(thenAst, elseAst))
@@ -541,7 +565,7 @@ class VAstCreator(
 
   //TODO: line number, column number und code + wenn left and right ast equal => einen kann man entfernen?
   // Nein! Man muss beide da behalten, muss in presenceConditionMap gesondert gehandled werdem!
-  private def astForChoiceNode(choiceStatement: Node): Ast = {
+  private def astForChoiceNode(choiceStatement: Node): Seq[Ast] = {
 
     // This "ID" is not unique and just a workaround, because AstNodes do not have IDs, but we need to identify them
     // to assign presenceCondition properties to them, when they are children of a choice node.
@@ -556,23 +580,23 @@ class VAstCreator(
       case pc: PresenceCondition => pc
     }
     if (presenceCondition.isTrue || choiceStatement.getNode(1).hasName("PrimaryIdentifier")) {
-      convertXTCNodeToJoern(choiceStatement.getNode(1))
+      astForXtcNoce(choiceStatement.getNode(1))
     }
     else {
       val choiceNode = controlStructureNode(choiceStatement, ControlStructureTypes.CHOICE, code(choiceStatement))
-      val leftAst = convertXTCNodeToJoern(choiceStatement.getNode(1))
+      val leftAst = astForXtcNoce(choiceStatement.getNode(1)).head
       var rightAst = Ast()
 
       val leftId = calculateAstNodeId(leftAst.root.get)
       var presenceConditionMap: Map[String, String] =
-                Map("AST1" -> presenceCondition.toString)
-//        Map(leftId -> presenceCondition.toString)
+        Map("AST1" -> presenceCondition.toString)
+      //        Map(leftId -> presenceCondition.toString)
 
       var presenceConditionEdges = Seq(AstEdge(choiceNode, leftAst.root.get))
       if (choiceStatement.size() == 4) {
-        rightAst = convertXTCNodeToJoern(choiceStatement.getNode(3))
+        rightAst = astForXtcNoce(choiceStatement.getNode(3)).head
         //TODO wieder rein kommentiewren: Ast.neighbourValidation(choiceNode, rightAst.root.get, EdgeTypes.AST)
-//        rightAst.root.get.storedRef
+        //        rightAst.root.get.storedRef
         presenceConditionEdges = presenceConditionEdges :+ AstEdge(choiceNode, rightAst.root.get)
         val negatedPresenceCondition = choiceStatement.get(2) match {
           case pc: PresenceCondition => pc
@@ -583,21 +607,21 @@ class VAstCreator(
         //                                          Choice
         //                             (macro, node)      (!macro, node)
         // where we can just replace the choice node with one of its child nodes.
-        if (leftId == rightId){
-          return leftAst
+        if (leftId == rightId) {
+          return Seq(leftAst)
         }
-//        presenceConditionMap =  presenceConditionMap + (rightId-> negatedPresenceCondition.toString)
-        
-        presenceConditionMap =  presenceConditionMap + ("AST2"-> negatedPresenceCondition.toString)
+        //        presenceConditionMap =  presenceConditionMap + (rightId-> negatedPresenceCondition.toString)
+
+        presenceConditionMap = presenceConditionMap + ("AST2" -> negatedPresenceCondition.toString)
       }
-      else{
+      else {
         //TODO: rename to fringe?
         presenceConditionMap = presenceConditionMap + ("UNKNOWN" -> presenceCondition.not().toString)
       }
       val presenceConditionMapSerialized = presenceConditionMap.asJson.noSpaces
       choiceNode.presenceCondition(presenceConditionMapSerialized)
 
-      Ast(
+      Seq(Ast(
         nodes = Seq(choiceNode) ++ leftAst.nodes ++ rightAst.nodes,
         edges = leftAst.edges ++ rightAst.edges ++ presenceConditionEdges,
         conditionEdges = leftAst.conditionEdges ++ rightAst.conditionEdges, //++ Seq(AstEdge(choiceNode, choiceNode)), //TODO: ++ presenceConditionEdges?
@@ -606,7 +630,7 @@ class VAstCreator(
         refEdges = leftAst.refEdges ++ rightAst.refEdges,
         bindsEdges = leftAst.bindsEdges ++ rightAst.bindsEdges,
         captureEdges = leftAst.captureEdges ++ rightAst.captureEdges
-      )
+      ))
 
       //      controlStructureAst(choiceNode, Option(choiceNode), Seq())
 
