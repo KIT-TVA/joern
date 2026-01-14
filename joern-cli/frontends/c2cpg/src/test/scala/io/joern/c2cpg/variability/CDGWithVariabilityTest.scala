@@ -24,15 +24,16 @@ class CDGWithVariabilityTest extends C2CpgSuite(withOssDataflow = true){
   val cCode =
     """
     #ifdef MACRO
- #define LIMIT 10
-#else
-#define LIMIT 2
-#endif
+      #define LIMIT 10
+    #else
+      #define LIMIT 2
+    #endif
     void foo(int a) {
-    if (a < LIMIT){
-      printf("Hello World!\n");
+      if (a < LIMIT){
+        printf("Hello World!\n");
+      }
     }
-}"""
+    """
   val stringReader = new StringReader(cCode)
 
   val dummyFile = new File("test.c")
@@ -53,10 +54,10 @@ class CDGWithVariabilityTest extends C2CpgSuite(withOssDataflow = true){
   new ReachingDefPass(superCpg).createAndApply()
   new PdgPresenceConditionAnnotationPass(superCpg).createAndApply()
   val superCTraversal = superCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
-  val superCAstDotString = DotCpg14Generator.toDotCpg14(superCTraversal).mkString
+//  val superCAstDotString = DotCpg14Generator.toDotCpg14(superCTraversal).mkString
 //  val superCAstDotString = DotAstGenerator.dotAst(superCTraversal).mkString
 //  val superCAstDotString = DotCfgGenerator.dotCfg(superCTraversal).mkString
-//  val superCAstDotString = DotDdgGenerator.toDotDdg(superCTraversal).mkString
+  val superCAstDotString = DotDdgGenerator.toDotDdg(superCTraversal).mkString
 
 
   println(superCAstDotString)
