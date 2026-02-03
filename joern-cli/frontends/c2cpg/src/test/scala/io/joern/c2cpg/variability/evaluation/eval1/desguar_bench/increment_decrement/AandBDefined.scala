@@ -1,4 +1,4 @@
-package io.joern.c2cpg.variability.evaluation.eval1
+package io.joern.c2cpg.variability.evaluation.eval1.desguar_bench.increment_decrement
 
 import io.joern.c2cpg.astcreation.{CGlobal, VAstCreator}
 import io.joern.c2cpg.testfixtures.C2CpgSuite
@@ -16,16 +16,20 @@ import superc.SuperC
 
 import java.io.{File, StringReader}
 
-class variabilityDependentMacroJoernCFrontend extends C2CpgSuite(withOssDataflow = true) {
+class AandBDefined extends C2CpgSuite(withOssDataflow = true) {
   implicit val semantics: Semantics = DefaultSemantics()
   val cCode =
     """
-    #define LIMIT 10
-    void foo(int a) {
-      if (a < LIMIT){
-        printf("Hello World!\n");
-      }
-    }
+int main() {
+  int x;
+  if (x) {
+    x++;
+  } else {
+    x--;
+  }
+  return 0;
+}
+
     """
   val cCpg = code(cCode)
   val cTraversal = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
