@@ -69,6 +69,20 @@ class VAstCreator(
     IASTBinaryExpression.op_ellipses -> Defines.OperatorEllipses*/
   )
 
+  private val UnaryOperatorMap: Map[String, String] = Map(
+//    IASTUnaryExpression.op_prefixIncr -> Operators.preIncrement,
+//    IASTUnaryExpression.op_prefixDecr -> Operators.preDecrement,
+//    IASTUnaryExpression.op_plus -> Operators.plus,
+//    IASTUnaryExpression.op_minus -> Operators.minus,
+//    IASTUnaryExpression.op_star -> Operators.indirection,
+//    IASTUnaryExpression.op_amper -> Operators.addressOf,
+//    IASTUnaryExpression.op_tilde -> Operators.not,
+//    IASTUnaryExpression.op_not -> Operators.logicalNot,
+//    IASTUnaryExpression.op_sizeof -> Operators.sizeOf,
+    "++" -> Operators.postIncrement,
+    "--" -> Operators.postDecrement,
+//    IASTUnaryExpression.op_typeid -> Defines.OperatorTypeOf
+  )
 
   override def createAst(): DiffGraphBuilder = {
     //TODO: filecontent
@@ -123,6 +137,7 @@ class VAstCreator(
       case "ExpressionStatement" =>
         node.getNode(0).getName match {
           case "FunctionCall" => Seq(astForFunctionCall(node))
+          case "Increment" | "Decrement" => Seq(astForUnaryExpression(node.getNode(0)))
           case _ => Seq(Ast())
         }
       case node => Seq(Ast()) //getChildren(node).map(convertXTCNodeToJoern).head
@@ -266,10 +281,28 @@ class VAstCreator(
     val op = OperatorMap.getOrElse(relExp.getNode(1).getString(0), Defines.OperatorUnknown)
     //TODO registerType?       callNode(relExp, code(relExp), op, op, DispatchTypes.STATIC_DISPATCH, None, Some(registerType(Defines.Any)))
     val callNode_ =
-      callNode(relExp, code(relExp), op, op, DispatchTypes.STATIC_DISPATCH, None, Some(Defines.Any))
+      callNode(relExp, code(relExp), op, op, DispatchTypes.STATIC_DISPATCH, None, Some(Defines.Any)) //TODO: register type
     val left = astForXtcNoce(relExp.getNode(0)).head
     val right = astForXtcNoce(relExp.getNode(2)).head
     callAst(callNode_, List(left, right))
+  }
+
+
+  private def astForUnaryExpression(unary: Node): Ast = {
+    val operatorMethod = UnaryOperatorMap.getOrElse(unary.getNode(1).getString(0), Defines.OperatorUnknown)
+
+      val cpgUnary = callNode(
+        unary,
+        code(unary),
+        operatorMethod,
+        operatorMethod,
+        DispatchTypes.STATIC_DISPATCH,
+        None,
+        Some(Defines.Any) //TODO: register type
+      )
+      val operand = astForXtcNoce(unary.getNode(0)).head
+      callAst(cpgUnary, List(operand))
+
   }
 
 
@@ -554,11 +587,14 @@ class VAstCreator(
     val ifNode = controlStructureNode(ifStmt, ControlStructureTypes.IF, code(ifStmt))
     val condAst = astForXtcNoce(ifStmt.getNode(1)).head
     val thenAst = astForXtcNoce(ifStmt.getNode(2)).head
+
+
+    val elseNode = controlStructureNode(ifStmt.getNode(4), ControlStructureTypes.ELSE, "else")
     val elseAst = ifStmt.size match {
-      case 4 => astForXtcNoce(ifStmt.getNode(3)).head
+      case 5 => astForXtcNoce(ifStmt.getNode(4)).head
       case _ => Ast()
     }
-    controlStructureAst(ifNode, Option(condAst), Seq(thenAst, elseAst))
+    controlStructureAst(ifNode, Option(condAst), Seq(thenAst, Ast(elseNode).withChild(elseAst)))
   }
 
   //TODO: line number, column number und code + wenn left and right ast equal => einen kann man entfernen?
