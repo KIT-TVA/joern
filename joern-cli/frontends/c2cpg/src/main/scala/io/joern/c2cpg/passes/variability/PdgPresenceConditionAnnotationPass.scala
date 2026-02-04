@@ -8,13 +8,8 @@ import io.shiftleft.codepropertygraph.generated.nodes.{ControlStructure, Method,
 import io.shiftleft.passes.ForkJoinParallelCpgPass
 import io.shiftleft.semanticcpg.language.*
 
-/** A pass that creates control flow graphs from abstract syntax trees.
- *
- * Control flow graphs can be calculated independently per method. Therefore, we inherit from
- * `ForkJoinParallelCpgPass`.
- *
- * Note: the version of OverflowDB that we currently use as a storage backend does not assign ids to edges and this
- * pass only creates edges at the moment. Therefore, we currently do without key pools.
+/**
+ * A pass that calculates the presence conditions of VPDG edges
  */
 class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPass[Method](cpg) {
 
@@ -91,7 +86,8 @@ class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPa
     }
 
 
-    val reachingDefEdges = method.graph.allEdges.toList.filter(_.property != null)
+    val reachingDefEdges = method.graph.allEdges.toList.filter(edge => edge.label == "CDG" || edge.property != null )
+    val test = method.graph.allEdges.toList
     val presenceConditions = reachingDefEdges.map { edge =>
       val p1 = presenceConditionBetween(edge.src, edge.dst)
       val p2 = presenceConditionBetween(method, edge.src)
