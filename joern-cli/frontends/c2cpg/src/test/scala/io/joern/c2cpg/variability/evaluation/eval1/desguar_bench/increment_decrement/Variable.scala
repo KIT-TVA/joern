@@ -2,7 +2,7 @@ package io.joern.c2cpg.variability.evaluation.eval1.desguar_bench.increment_decr
 
 import io.joern.c2cpg.astcreation.{CGlobal, VAstCreator}
 import io.joern.c2cpg.testfixtures.C2CpgSuite
-import io.joern.c2cpg.variability.util.TestUtil.{generateVASTDot, generateVCPGDot}
+import io.joern.c2cpg.variability.util.TestUtil.{generateVASTDot, generateVCFGDot, generateVCPGDot, generateVDDGDot, generateVPDGDot}
 import io.joern.dataflowengineoss.DefaultSemantics
 import io.joern.dataflowengineoss.dotgenerator.{DotCpg14Generator, DotDdgGenerator}
 import io.joern.dataflowengineoss.passes.reachingdef.ReachingDefPass
@@ -35,7 +35,15 @@ int main() {
 }
 
     """
-  val superCDotString = generateVCPGDot(cCode)
-  println("\n\n\nSuperC (V)CPG:")
-  println(superCDotString)
+  val superCDotStringVAST = generateVASTDot(cCode)
+  println("\n\n\nSuperC (V)AST:")
+  println(superCDotStringVAST)
+  println()
+  println()
+  println()
+  println()
+
+  val superCDotStringVCFG = generateVCFGDot(cCode)
+  println("\n\n\nSuperC (V)CFG:")
+  println(superCDotStringVCFG)
 }

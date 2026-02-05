@@ -5,7 +5,7 @@ import io.joern.c2cpg.parser.FileDefaults
 import io.joern.c2cpg.passes.variability.PdgPresenceConditionAnnotationPass
 import io.joern.c2cpg.testfixtures.{AstC2CpgSuite, C2CpgSuite, CDefaultTestCpg}
 import io.joern.dataflowengineoss.DefaultSemantics
-import io.joern.dataflowengineoss.dotgenerator.{DotCpg14Generator, DotDdgGenerator}
+import io.joern.dataflowengineoss.dotgenerator.{DotCpg14Generator, DotDdgGenerator, DotPdgGenerator}
 import io.joern.dataflowengineoss.passes.reachingdef.ReachingDefPass
 import io.joern.dataflowengineoss.semanticsloader.Semantics
 import io.joern.x2cpg.X2Cpg
@@ -36,6 +36,11 @@ object TestUtil {
   def generateVDDGDot(cCode: String): String = {
     val vcpg = generateVCPG(cCode)
     DotDdgGenerator.toDotDdg(vcpg).mkString
+  }
+
+  def generateVPDGDot(cCode: String): String = {
+    val vcpg = generateVCPG(cCode)
+    DotPdgGenerator.toDotPdg(vcpg).mkString
   }
 
 

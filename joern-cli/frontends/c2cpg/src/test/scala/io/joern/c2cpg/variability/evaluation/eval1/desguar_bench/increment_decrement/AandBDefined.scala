@@ -33,7 +33,7 @@ int main() {
     """
   val cCpg = code(cCode)
   val cTraversal = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
-  val cAstDotString = DotCpg14Generator.toDotCpg14(cTraversal)
-  println("Standard Joern C CPG:")
+  val cAstDotString = DotAstGenerator.dotAst(cTraversal)
+  println("Standard Joern C Ast:")
   println(cAstDotString.mkString)
 }
