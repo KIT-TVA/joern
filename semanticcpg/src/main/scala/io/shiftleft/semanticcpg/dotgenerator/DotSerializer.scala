@@ -60,7 +60,16 @@ object DotSerializer {
 
           val edgeId = edgeType match {
             case "AST" => "AST" + dst.property[Integer]("ORDER").toString
-            case "CFG" => "CFG" + dst.id().toString
+            case "CFG" => {
+              val x = "CFG" + dst.id().toString
+              if(presenceConditionMap.keys.contains(x)){
+                x
+              }
+              else{
+                // We do this because during VCFG generation we do not know what the fringe node is
+                "UNKNOWN"
+              }
+            }
             case "DDG" | "CDG" => "PDG" + dst.id().toString
             case _ => ""
           }
