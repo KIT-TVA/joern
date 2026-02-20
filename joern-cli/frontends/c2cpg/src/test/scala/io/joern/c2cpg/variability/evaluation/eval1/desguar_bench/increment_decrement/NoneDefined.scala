@@ -11,7 +11,7 @@ import io.joern.x2cpg.X2Cpg
 import io.joern.x2cpg.X2Cpg.newEmptyCpg
 import io.joern.x2cpg.passes.frontend.MetaDataPass
 import io.shiftleft.codepropertygraph.generated.{DiffGraphBuilder, Languages, nodes}
-import io.shiftleft.semanticcpg.dotgenerator.DotAstGenerator
+import io.shiftleft.semanticcpg.dotgenerator.{DotAstGenerator, DotCfgGenerator}
 import superc.SuperC
 
 import java.io.{File, StringReader}
@@ -31,7 +31,9 @@ int main() {
     """
   val cCpg = code(cCode)
   val cTraversal = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
-  val cAstDotString = DotAstGenerator.dotAst(cTraversal)
+  val cAstDotString = DotCfgGenerator.dotCfg(cTraversal)
   println("Standard Joern C Ast:")
   println(cAstDotString.mkString)
+
+
 }

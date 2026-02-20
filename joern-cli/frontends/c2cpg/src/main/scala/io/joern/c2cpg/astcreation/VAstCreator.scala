@@ -99,20 +99,20 @@ class VAstCreator(
   def astForXtcTree(node: Node): Ast = {
     val diffGraph: DiffGraphBuilder = Cpg.newDiffGraphBuilder
     //    val testI = convertXTCNodeToJoern(node.getNode(0).getNode(0).getNode(1).getNode(1).getNode(1).getNode(0).getNode(1))
-    val joernNode = astForXtcNoce(node.getNode(0).getNode(0).getNode(1))
+    val joernNode = astForXtcNode(node.getNode(0).getNode(0).getNode(1))
     //implicit val validationMode: ValidationMode = ValidationMode.Disabled
     //Ast(joernNode)
     joernNode.head
   }
 
   //TODO: Theoretisch können überall choice nodes sein, auch in params etc.
-  def astForXtcNoce(node: Node): Seq[Ast] = {
+  def astForXtcNode(node: Node): Seq[Ast] = {
     /*node match {
       case text: Text[_]
     }*/
     node.getName match {
       case "Conditional" => astForChoiceNode(node)
-      case "Declaration" => astForXtcNoce(node.getNode(0)) //TODO ?
+      case "Declaration" => astForXtcNode(node.getNode(0)) //TODO ?
       case "DeclaringList" => astsForDeclarationList(node)
       case "SimpleDeclarator" =>
         Seq(astForSimpleDeclaration(node))
@@ -134,6 +134,8 @@ class VAstCreator(
           case "if" => Seq(astForIf(node))
           case _ => Seq(Ast())
         }
+      case "ParameterTypeList" | "ParameterList" => getChildren(node).flatMap(astForXtcNode)
+      case "ParameterIdentifierDeclaration" => Seq(astForParameter(node))
       case "ExpressionStatement" =>
         node.getNode(0).getName match {
           case "FunctionCall" => Seq(astForFunctionCall(node))
@@ -220,6 +222,24 @@ class VAstCreator(
     Seq(declAst, initAst)
   }
 
+  private def astForParameter(parameterNode: Node) : Ast = {
+    val returnType = parameterNode.getString(0)
+    val name = parameterNode.getNode(1).getString(0)
+    val code = returnType + " " + name
+
+    // We are not able to set all fields of the parameter node here because we do not know the parent node.
+    // This is due to parameters potentially being nested in choice nodes, and we thus set the missing fields in
+    // the astForFunctionDefinition function!
+    val joernParameterNode = NewMethodParameterIn()
+      .name(name)
+      .code(code)
+      .typeFullName(returnType)
+      .lineNumber(line(parameterNode))
+      .columnNumber(column(parameterNode))
+
+    Ast(joernParameterNode)
+  }
+
   private def astForSimpleDeclaration(simpleDeclaration: Node): Ast = {
     astForIdentifier(simpleDeclaration)
     //    convertXTCNodeToJoern(simpleDeclaration.getNode(0))
@@ -228,7 +248,7 @@ class VAstCreator(
   private def astForInitializer(declarator: Node, init: Node): Ast = {
     init match {
       case equalInit: Node if equalInit.hasName("Initializer") =>
-        astForEqualsInitializer(declarator, astForXtcNoce(declarator.getNode(1)).head, astForXtcNoce(equalInit.getNode(0)).head)
+        astForEqualsInitializer(declarator, astForXtcNode(declarator.getNode(1)).head, astForXtcNode(equalInit.getNode(0)).head)
       case _ => Ast()
     }
   }
@@ -261,7 +281,7 @@ class VAstCreator(
     val cpgReturn = returnNode(returnStatement, code(returnStatement))
     var arg = Ast()
     if (returnStatement.size() > 0) {
-      arg = astForXtcNoce(returnStatement.getNode(0)).head
+      arg = astForXtcNode(returnStatement.getNode(0)).head
     }
     arg match {
       case retAst if retAst.root.isDefined => Ast(cpgReturn).withChild(retAst).withArgEdge(cpgReturn, retAst.root.get)
@@ -282,8 +302,8 @@ class VAstCreator(
     //TODO registerType?       callNode(relExp, code(relExp), op, op, DispatchTypes.STATIC_DISPATCH, None, Some(registerType(Defines.Any)))
     val callNode_ =
       callNode(relExp, code(relExp), op, op, DispatchTypes.STATIC_DISPATCH, None, Some(Defines.Any)) //TODO: register type
-    val left = astForXtcNoce(relExp.getNode(0)).head
-    val right = astForXtcNoce(relExp.getNode(2)).head
+    val left = astForXtcNode(relExp.getNode(0)).head
+    val right = astForXtcNode(relExp.getNode(2)).head
     callAst(callNode_, List(left, right))
   }
 
@@ -300,14 +320,14 @@ class VAstCreator(
         None,
         Some(Defines.Any) //TODO: register type
       )
-      val operand = astForXtcNoce(unary.getNode(0)).head
+      val operand = astForXtcNode(unary.getNode(0)).head
       callAst(cpgUnary, List(operand))
 
   }
 
 
   private def astsForStringLiteralList(stringLitList: Node): Seq[Ast] = {
-    getChildren(stringLitList).flatMap(astForXtcNoce)
+    getChildren(stringLitList).flatMap(astForXtcNode)
     /* if (stringLitList.size == 1) {
        convertXTCNodeToJoern(stringLitList.getNode(0)).head
      }
@@ -339,7 +359,7 @@ class VAstCreator(
       .columnNumber(blockColumn)
     //.typeFullName(registerType(Defines.Void))
     //scope.pushNewBlockScope(node)
-    val childAsts = getChildren(blockStmt.getNode(1)).flatMap(astForXtcNoce).toList // blockStmt.getStatements.flatMap(astsForStatement).toList
+    val childAsts = getChildren(blockStmt.getNode(1)).flatMap(astForXtcNode).toList // blockStmt.getStatements.flatMap(astsForStatement).toList
     //    scope.popScope()
     blockAst(node, childAsts)
   }
@@ -520,7 +540,7 @@ class VAstCreator(
           choiceNode.add(3, clonedExpressionStatement)
 
         }
-        astForXtcNoce(choiceNode).head
+        astForXtcNode(choiceNode).head
       }
       // If the name node is not a choice node we can easily translate it.
       case _ =>
@@ -530,8 +550,8 @@ class VAstCreator(
           callNode(expressionStatement, code(expressionStatement), name, name, dispatchType, Some(""), Some("registerType(callTypeFullName)"))
         //TODO: Hier ist das Problem, dass die StringLiteralList nochmal potenziell in einem conditional ist, das heißt wir sollten die convert Funktion allgemein verändern!
         val args: Seq[Ast] = getChildren(expressionStatement.getNode(0).getNode(1)).flatMap {
-          case stringLiteralList: Node if stringLiteralList.hasName("StringLiteralList") => getChildren(stringLiteralList).flatMap(astForXtcNoce)
-          case node: Node => astForXtcNoce(node)
+          case stringLiteralList: Node if stringLiteralList.hasName("StringLiteralList") => getChildren(stringLiteralList).flatMap(astForXtcNode)
+          case node: Node => astForXtcNode(node)
         } //.map(convertXTCNodeToJoern)
         createCallAst(callCpgNode, args)
 
@@ -552,12 +572,12 @@ class VAstCreator(
     //TODO: COde machen wir indem wir in order über die child nodes drüber gehen und da jeweils code() aufrufen (aber diese code funktion müssen wir auch noch schreiben)
     //    val methodBlockNode_ = NewBlock()
     //val blockAst_ : Ast = blockAst(methodBlockNode_, List(): List[Ast])
-    val blockAst_ : Ast = astForXtcNoce(funcDef.getNode(1)).head
+    val blockAst_ : Ast = astForXtcNode(funcDef.getNode(1)).head
     val methodBlockNode = blockNode(funcDef)
     val methodNode_ = NewMethod()
       .name(name)
       .filename(filename)
-    val parameters = functionPrototype.getNode(1).getNode(1).getNode(0) match {
+    /*val parameters = functionPrototype.getNode(1).getNode(1).getNode(0) match {
       case ParameterTypeListOpt: Node if ParameterTypeListOpt.size > 0 =>
         val parameterList = ParameterTypeListOpt.getNode(0).getNode(0)
 
@@ -565,14 +585,39 @@ class VAstCreator(
         val xtcParameterNodes = getChildren(parameterList).map(_.getNode(1))
         xtcParameterNodes.zipWithIndex.map((paramNode, index) => getJoernParam(paramNode, funcDef, index))
       case _ => Seq()
-    }
+    }*/
+
     // funcDef.getNode(1) is the function body compoundStatement
     //val methodBodyAst = astForMethodBody(funcDef.getNode(1), methodBlockNode)
 
+    val superCParameterList = functionPrototype.getNode(1).getNode(1).getNode(0)
+    //TODO: wieso hier Kinder besorgen und dann .head? Hier ist noch irgendwas falsch
+    val oldParameterAst = getChildren(superCParameterList).flatMap(astForXtcNode).head
+
+    // When we parse the parameter nodes recursively, we do not know their index or parent, which is why we need to
+    // replace those values here. To do this we replace the entire NewMethodParameterIn
+    val (_, newParamNodes) = oldParameterAst.nodes.foldLeft((0, Vector.empty[NewNode])) {
+      case ((cnt, acc), p: NewMethodParameterIn) =>
+        val newParam = parameterInNode(funcDef, p.name, p.code, cnt + 1, false, "BY_VALUE", p.typeFullName)
+        (cnt + 1, acc :+ newParam)
+      case ((cnt, acc), n) =>
+        (cnt, acc :+ n)
+    }
+
+    val parameterAst = Ast(
+      nodes = newParamNodes,
+      edges = leftAst.edges ++ rightAst.edges ++ presenceConditionEdges,
+      conditionEdges = leftAst.conditionEdges ++ rightAst.conditionEdges, //++ Seq(AstEdge(choiceNode, choiceNode)), //TODO: ++ presenceConditionEdges?
+      argEdges = leftAst.argEdges ++ rightAst.argEdges,
+      receiverEdges = leftAst.receiverEdges ++ rightAst.receiverEdges,
+      refEdges = leftAst.refEdges ++ rightAst.refEdges,
+      bindsEdges = leftAst.bindsEdges ++ rightAst.bindsEdges,
+      captureEdges = leftAst.captureEdges ++ rightAst.captureEdges
+    )
 
     methodAst(
       methodNode_,
-      parameters.map(Ast(_)),
+      params, //TODO: chose correct params
       blockAst_,
       methodReturnNode(funcDef, returnType),
       modifiers = List()
@@ -585,13 +630,13 @@ class VAstCreator(
 
   private def astForIf(ifStmt: Node): Ast = {
     val ifNode = controlStructureNode(ifStmt, ControlStructureTypes.IF, code(ifStmt))
-    val condAst = astForXtcNoce(ifStmt.getNode(1)).head
-    val thenAst = astForXtcNoce(ifStmt.getNode(2)).head
+    val condAst = astForXtcNode(ifStmt.getNode(1)).head
+    val thenAst = astForXtcNode(ifStmt.getNode(2)).head
 
 
     val elseNode = controlStructureNode(ifStmt.getNode(4), ControlStructureTypes.ELSE, "else")
     val elseAst = ifStmt.size match {
-      case 5 => astForXtcNoce(ifStmt.getNode(4)).head
+      case 5 => astForXtcNode(ifStmt.getNode(4)).head
       case _ => Ast()
     }
     controlStructureAst(ifNode, Option(condAst), Seq(thenAst, Ast(elseNode).withChild(elseAst)))
@@ -614,11 +659,11 @@ class VAstCreator(
       case pc: PresenceCondition => pc
     }
     if (presenceCondition.isTrue || choiceStatement.getNode(1).hasName("PrimaryIdentifier")) {
-      astForXtcNoce(choiceStatement.getNode(1))
+      astForXtcNode(choiceStatement.getNode(1))
     }
     else {
       val choiceNode = controlStructureNode(choiceStatement, ControlStructureTypes.CHOICE, code(choiceStatement))
-      val leftAst = astForXtcNoce(choiceStatement.getNode(1)).head
+      val leftAst = astForXtcNode(choiceStatement.getNode(1)).head
       var rightAst = Ast()
 
       val leftId = calculateAstNodeId(leftAst.root.get)
@@ -628,7 +673,7 @@ class VAstCreator(
 
       var presenceConditionEdges = Seq(AstEdge(choiceNode, leftAst.root.get))
       if (choiceStatement.size() == 4) {
-        rightAst = astForXtcNoce(choiceStatement.getNode(3)).head
+        rightAst = astForXtcNode(choiceStatement.getNode(3)).head
         //TODO wieder rein kommentiewren: Ast.neighbourValidation(choiceNode, rightAst.root.get, EdgeTypes.AST)
         //        rightAst.root.get.storedRef
         presenceConditionEdges = presenceConditionEdges :+ AstEdge(choiceNode, rightAst.root.get)
