@@ -479,6 +479,9 @@ class CfgCreator(entryNode: Method, diffGraph: DiffGraphBuilder) {
     val leftCfg = node.traversal.out.collectAll[AstNode].order(1).headOption.map(cfgFor).getOrElse(Cfg.empty)
     val rightCfg = node.traversal.out.collectAll[AstNode].order(2).headOption.map(cfgFor).getOrElse(Cfg.empty)
 
+    if(leftCfg.entryNode.isEmpty && rightCfg.entryNode.isEmpty){
+      return choiceNodeCfg
+    }
 
     val jsonString = node.property[String]("PRESENCE_CONDITION")
     var presenceConditionMap: Map[String, String] = decode[Map[String, String]](jsonString).getOrElse(Map.empty)

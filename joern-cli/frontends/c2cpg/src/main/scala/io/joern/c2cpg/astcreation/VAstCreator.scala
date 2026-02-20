@@ -592,32 +592,44 @@ class VAstCreator(
 
     val superCParameterList = functionPrototype.getNode(1).getNode(1).getNode(0)
     //TODO: wieso hier Kinder besorgen und dann .head? Hier ist noch irgendwas falsch
-    val oldParameterAst = getChildren(superCParameterList).flatMap(astForXtcNode).head
+    val oldParameterAsts = getChildren(superCParameterList).flatMap(astForXtcNode)
+    val newParameterAsts = oldParameterAsts.map{
+      oldParameterAst =>
+        val oldParameterNodes = oldParameterAst.nodes
+        // When we parse the parameter nodes recursively, we do not know their index or parent, which is why we need to
+        // replace those values here. To do this we replace the entire NewMethodParameterIn
+        val (_, newParamNodes) = oldParameterAst.nodes.foldLeft((0, Vector.empty[NewNode])) {
+          case ((cnt, acc), p: NewMethodParameterIn) =>
+            val newParam = parameterInNode(funcDef, p.name, p.code, cnt + 1, false, "BY_VALUE", p.typeFullName)
+            (cnt + 1, acc :+ newParam)
+          case ((cnt, acc), n) =>
+            (cnt, acc :+ n)
+        }
 
-    // When we parse the parameter nodes recursively, we do not know their index or parent, which is why we need to
-    // replace those values here. To do this we replace the entire NewMethodParameterIn
-    val (_, newParamNodes) = oldParameterAst.nodes.foldLeft((0, Vector.empty[NewNode])) {
-      case ((cnt, acc), p: NewMethodParameterIn) =>
-        val newParam = parameterInNode(funcDef, p.name, p.code, cnt + 1, false, "BY_VALUE", p.typeFullName)
-        (cnt + 1, acc :+ newParam)
-      case ((cnt, acc), n) =>
-        (cnt, acc :+ n)
+        def updateEdge(edge: AstEdge): AstEdge = {
+          edge match {
+            case AstEdge(src, dst) => AstEdge(newParamNodes(oldParameterNodes.indexOf(src)),
+              newParamNodes(oldParameterNodes.indexOf(dst)))
+          }
+        }
+
+        val parameterAst = Ast(
+          nodes = newParamNodes,
+          edges = oldParameterAst.edges.map(updateEdge),
+          conditionEdges = oldParameterAst.conditionEdges.map(updateEdge),
+          argEdges = oldParameterAst.argEdges.map(updateEdge),
+          receiverEdges = oldParameterAst.receiverEdges.map(updateEdge),
+          refEdges = oldParameterAst.refEdges.map(updateEdge),
+          bindsEdges = oldParameterAst.bindsEdges.map(updateEdge),
+          captureEdges = oldParameterAst.captureEdges.map(updateEdge),
+        )
+        parameterAst
     }
 
-    val parameterAst = Ast(
-      nodes = newParamNodes,
-      edges = leftAst.edges ++ rightAst.edges ++ presenceConditionEdges,
-      conditionEdges = leftAst.conditionEdges ++ rightAst.conditionEdges, //++ Seq(AstEdge(choiceNode, choiceNode)), //TODO: ++ presenceConditionEdges?
-      argEdges = leftAst.argEdges ++ rightAst.argEdges,
-      receiverEdges = leftAst.receiverEdges ++ rightAst.receiverEdges,
-      refEdges = leftAst.refEdges ++ rightAst.refEdges,
-      bindsEdges = leftAst.bindsEdges ++ rightAst.bindsEdges,
-      captureEdges = leftAst.captureEdges ++ rightAst.captureEdges
-    )
 
     methodAst(
       methodNode_,
-      params, //TODO: chose correct params
+      newParameterAsts,
       blockAst_,
       methodReturnNode(funcDef, returnType),
       modifiers = List()
