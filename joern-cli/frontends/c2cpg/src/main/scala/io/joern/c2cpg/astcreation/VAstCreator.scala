@@ -372,13 +372,13 @@ class VAstCreator(
 
    superc.core.Syntax$Text("\"B\"")))))))*/
 
-  def getJoernParam(parameterNode: Node, parentNode: Node, index: Int): NewMethodParameterIn = {
+/*  def getJoernParam(parameterNode: Node, parentNode: Node, index: Int): NewMethodParameterIn = {
     val returnType = parameterNode.getString(0)
     val name = parameterNode.getNode(1).getString(0)
     val code = returnType + " " + name
     //TODO: was macht child 3, die AttributeSpecifierListOpt()?
     parameterInNode(parentNode, name, code, index, false, "BY_VALUE", returnType)
-  }
+  }*/
 
   def getChildren(node: Node): Seq[Node] = {
     (0 until node.size()).map(node.get).collect { case g: Node => g }
