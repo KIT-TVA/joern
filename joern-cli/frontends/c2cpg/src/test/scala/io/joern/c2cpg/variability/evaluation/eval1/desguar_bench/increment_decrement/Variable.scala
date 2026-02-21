@@ -46,4 +46,13 @@ int main() {
   val superCDotStringVCFG = generateVCFGDot(cCode)
   println("\n\n\nSuperC (V)CFG:")
   println(superCDotStringVCFG)
+
+  println()
+  println()
+  println()
+  println()
+
+  val superCDotStringVPDG = generateVPDGDot(cCode)
+  println("\n\n\nSuperC (V)PDG:")
+  println(superCDotStringVPDG)
 }

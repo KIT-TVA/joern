@@ -4,7 +4,7 @@ import io.joern.c2cpg.astcreation.{CGlobal, VAstCreator}
 import io.joern.c2cpg.testfixtures.C2CpgSuite
 import io.joern.c2cpg.variability.util.TestUtil.{generateVASTDot, generateVCPGDot}
 import io.joern.dataflowengineoss.DefaultSemantics
-import io.joern.dataflowengineoss.dotgenerator.{DotCpg14Generator, DotDdgGenerator}
+import io.joern.dataflowengineoss.dotgenerator.{DotCpg14Generator, DotDdgGenerator, DotPdgGenerator}
 import io.joern.dataflowengineoss.passes.reachingdef.ReachingDefPass
 import io.joern.dataflowengineoss.semanticsloader.Semantics
 import io.joern.x2cpg.X2Cpg
@@ -42,7 +42,17 @@ int main() {
   println()
   println()
 
-  val cCfgDotString = DotCfgGenerator.dotCfg(cTraversal)
+ /* val cCfgDotString = DotCfgGenerator.dotCfg(cTraversal)
   println("Standard Joern C Cfg:")
-  println(cCfgDotString.mkString)
+  println(cCfgDotString.mkString)*/
+
+
+  println()
+  println()
+  println()
+  println()
+
+  val cPdgDotString = DotPdgGenerator.toDotPdg(cTraversal)
+  println("Standard Joern C PDG:")
+  println(cPdgDotString.mkString)
 }
