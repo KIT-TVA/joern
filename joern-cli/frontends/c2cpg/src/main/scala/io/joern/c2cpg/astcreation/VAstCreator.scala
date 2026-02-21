@@ -134,7 +134,15 @@ class VAstCreator(
           case "if" => Seq(astForIf(node))
           case _ => Seq(Ast())
         }
-      case "ParameterTypeList" | "ParameterList" => getChildren(node).flatMap(astForXtcNode)
+      case "ParameterTypeList"  => getChildren(node).flatMap(astForXtcNode)
+      case "ParameterList" =>
+        val params = getChildren(node).flatMap(astForXtcNode)
+        if (params.size > 1) {
+          Seq(astForParameterList(node, params))
+        }
+        else {
+          Seq(params.head)
+        }
       case "ParameterIdentifierDeclaration" => Seq(astForParameter(node))
       case "ExpressionStatement" =>
         node.getNode(0).getName match {
@@ -220,6 +228,18 @@ class VAstCreator(
     //    Seq(Ast(node), initAst)
 
     Seq(declAst, initAst)
+  }
+
+  private def astForParameterList(paramList: Node, params: Seq[Ast]): Ast = {
+    val codeString = code(paramList)
+    val blockLine = line(paramList)
+    val blockColumn = column(paramList)
+    val node = blockNode(paramList)
+      .code(codeString)
+      .lineNumber(blockLine)
+      .columnNumber(blockColumn)
+
+    blockAst(node, params.toList)
   }
 
   private def astForParameter(parameterNode: Node) : Ast = {
@@ -591,7 +611,6 @@ class VAstCreator(
     //val methodBodyAst = astForMethodBody(funcDef.getNode(1), methodBlockNode)
 
     val superCParameterList = functionPrototype.getNode(1).getNode(1).getNode(0)
-    //TODO: wieso hier Kinder besorgen und dann .head? Hier ist noch irgendwas falsch
     val oldParameterAsts = getChildren(superCParameterList).flatMap(astForXtcNode)
     val newParameterAsts = oldParameterAsts.map{
       oldParameterAst =>
@@ -664,6 +683,7 @@ class VAstCreator(
       val lineNumber = node.properties("LINE_NUMBER").asInstanceOf[Int]
       val columnNumber = node.properties("COLUMN_NUMBER").asInstanceOf[Int]
       val code = node.properties("CODE").asInstanceOf[String]
+      println(s"$lineNumber, $columnNumber $code")
       s"$lineNumber, $columnNumber $code"
     }
 
