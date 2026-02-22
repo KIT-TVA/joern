@@ -73,8 +73,12 @@ class CfgCreator(entryNode: Method, diffGraph: DiffGraphBuilder) {
     * creating a CFG containing the single method node and a fringe containing the node and an outgoing AlwaysEdge, to
     * the CFG obtained by translating child CFGs one by one and appending them.
     */
-  private def cfgForMethod(node: Method): Cfg =
-    cfgForSingleNode(node) ++ cfgForChildren(node)
+  private def cfgForMethod(node: Method): Cfg = {
+    //TODO: Children of the method node that are choice nodes, can only contain parameters. And Parameters should create an empty CFG, which is why we remove them here. This is not an elegant solution and should be fixed in the future!
+    // 
+    //    cfgForSingleNode(node) ++ cfgForChildren(node)
+    cfgForSingleNode(node) ++ node.astChildren.filter(_.properties.getOrElse("PRESENCE_CONDITION", "") == "").l.map(cfgFor).reduceOption((x, y) => x ++ y).getOrElse(Cfg.empty)
+  }
 
   /** For any single AST node, we can construct a CFG containing that single node by setting it as the entry node and
     * placing it in the fringe.

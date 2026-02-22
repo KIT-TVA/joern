@@ -624,7 +624,6 @@ class VAstCreator(
 
     def rec2(n:Node, path: Seq[(Option[Int], Option[Int], PresenceCondition)]): Unit = {
 
-
       if (n.hasName("ParameterIdentifierDeclaration")) {
         parameterNodes = parameterNodes.appended(n)
         paths = paths.appended(path)
@@ -634,6 +633,13 @@ class VAstCreator(
           val c = column(n)
           val l = line(n)
           val leftPresenceCondition = n.get(0).asInstanceOf[PresenceCondition]
+          if(leftPresenceCondition.isTrue){
+            rec2(n.getNode(1),path)
+            if(n.size() == 4){
+              rec2(n.getNode(3),path)
+            }
+            return
+          }
 
           rec2(n.getNode(1), path.appended((c,l,leftPresenceCondition)))
 
@@ -680,7 +686,6 @@ class VAstCreator(
         )
       }
 
-      println(i)
       path.foldRight(parameterNode)(foldFunc)
     }
     
@@ -721,7 +726,6 @@ class VAstCreator(
       val lineNumber = node.properties("LINE_NUMBER").asInstanceOf[Int]
       val columnNumber = node.properties("COLUMN_NUMBER").asInstanceOf[Int]
       val code = node.properties("CODE").asInstanceOf[String]
-      println(s"$lineNumber, $columnNumber $code")
       s"$lineNumber, $columnNumber $code"
     }
 

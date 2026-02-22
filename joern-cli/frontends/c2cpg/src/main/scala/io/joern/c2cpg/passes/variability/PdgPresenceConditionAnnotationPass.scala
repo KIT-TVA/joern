@@ -115,9 +115,6 @@ class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPa
           edges.map { case (edge, presenceCondition) => "PDG" + edge.dst.id().toString -> presenceCondition }.toMap
         val newPresenceConditionMapSerialized = newPresenceConditionMap.asJson.noSpaces
         diffGraph.setNodeProperty(src, "PRESENCE_CONDITION", newPresenceConditionMapSerialized)
-        /*        if(method.name == "foo"){
-                  println(src.toString + "      " + newPresenceConditionMapSerialized)
-                }*/
       }
   }
 
