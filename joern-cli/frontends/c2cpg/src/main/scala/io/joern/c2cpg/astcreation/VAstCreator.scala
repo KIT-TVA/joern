@@ -143,7 +143,7 @@ class VAstCreator(
         else {
           Seq(params.head)
         }
-      case "ParameterIdentifierDeclaration" => Seq(astForParameter(node))
+//      case "ParameterIdentifierDeclaration" => Seq(astForParameter(node))
       case "ExpressionStatement" =>
         node.getNode(0).getName match {
           case "FunctionCall" => Seq(astForFunctionCall(node))
@@ -231,6 +231,7 @@ class VAstCreator(
   }
 
   private def astForParameterList(paramList: Node, params: Seq[Ast]): Ast = {
+
     val codeString = code(paramList)
     val blockLine = line(paramList)
     val blockColumn = column(paramList)
@@ -242,22 +243,28 @@ class VAstCreator(
     blockAst(node, params.toList)
   }
 
-  private def astForParameter(parameterNode: Node) : Ast = {
+  private def astForParameter(parameterNode: Node, index: Int, parentNode: Node) : Ast = {
+
+
+
     val returnType = parameterNode.getString(0)
     val name = parameterNode.getNode(1).getString(0)
     val code = returnType + " " + name
-
+    //TODO: was macht child 3, die AttributeSpecifierListOpt()?
+    val param = parameterInNode(parentNode, name, code, index, false, "BY_VALUE", returnType)
+    Ast(Seq(param))
     // We are not able to set all fields of the parameter node here because we do not know the parent node.
     // This is due to parameters potentially being nested in choice nodes, and we thus set the missing fields in
     // the astForFunctionDefinition function!
-    val joernParameterNode = NewMethodParameterIn()
+    /*val joernParameterNode = NewMethodParameterIn()
       .name(name)
       .code(code)
       .typeFullName(returnType)
       .lineNumber(line(parameterNode))
       .columnNumber(column(parameterNode))
 
-    Ast(joernParameterNode)
+    Ast(joernParameterNode)*/
+
   }
 
   private def astForSimpleDeclaration(simpleDeclaration: Node): Ast = {
@@ -611,44 +618,75 @@ class VAstCreator(
     //val methodBodyAst = astForMethodBody(funcDef.getNode(1), methodBlockNode)
 
     val superCParameterList = functionPrototype.getNode(1).getNode(1).getNode(0)
-    val oldParameterAsts = getChildren(superCParameterList).flatMap(astForXtcNode)
-    val newParameterAsts = oldParameterAsts.map{
-      oldParameterAst =>
-        val oldParameterNodes = oldParameterAst.nodes
-        // When we parse the parameter nodes recursively, we do not know their index or parent, which is why we need to
-        // replace those values here. To do this we replace the entire NewMethodParameterIn
-        val (_, newParamNodes) = oldParameterAst.nodes.foldLeft((0, Vector.empty[NewNode])) {
-          case ((cnt, acc), p: NewMethodParameterIn) =>
-            val newParam = parameterInNode(funcDef, p.name, p.code, cnt + 1, false, "BY_VALUE", p.typeFullName)
-            (cnt + 1, acc :+ newParam)
-          case ((cnt, acc), n) =>
-            (cnt, acc :+ n)
-        }
 
-        def updateEdge(edge: AstEdge): AstEdge = {
-          edge match {
-            case AstEdge(src, dst) => AstEdge(newParamNodes(oldParameterNodes.indexOf(src)),
-              newParamNodes(oldParameterNodes.indexOf(dst)))
+    var paths : Seq[Seq[(Option[Int], Option[Int], PresenceCondition)]] = Seq()
+    var parameterNodes: Seq[Node] = Seq()
+
+    def rec2(n:Node, path: Seq[(Option[Int], Option[Int], PresenceCondition)]): Unit = {
+
+
+      if (n.hasName("ParameterIdentifierDeclaration")) {
+        parameterNodes = parameterNodes.appended(n)
+        paths = paths.appended(path)
+      }
+      else{
+        if (isChoiceNode(n)) {
+          val c = column(n)
+          val l = line(n)
+          val leftPresenceCondition = n.get(0).asInstanceOf[PresenceCondition]
+
+          rec2(n.getNode(1), path.appended((c,l,leftPresenceCondition)))
+
+          if(n.size() == 4){
+            val rightPresenceCondition = n.get(2).asInstanceOf[PresenceCondition]
+            rec2(n.getNode(3), path.appended((c, l, rightPresenceCondition)))
           }
         }
-
-        val parameterAst = Ast(
-          nodes = newParamNodes,
-          edges = oldParameterAst.edges.map(updateEdge),
-          conditionEdges = oldParameterAst.conditionEdges.map(updateEdge),
-          argEdges = oldParameterAst.argEdges.map(updateEdge),
-          receiverEdges = oldParameterAst.receiverEdges.map(updateEdge),
-          refEdges = oldParameterAst.refEdges.map(updateEdge),
-          bindsEdges = oldParameterAst.bindsEdges.map(updateEdge),
-          captureEdges = oldParameterAst.captureEdges.map(updateEdge),
-        )
-        parameterAst
+        else{
+          getChildren(n).foreach(childNode =>
+            rec2(childNode, path))
+        }
+      }
     }
+    rec2(superCParameterList, Seq())
 
 
+
+    val parameterAsts = parameterNodes.zip(paths).zipWithIndex.map{ case ((n, path), i) =>
+      val parameterNode = astForParameter(n, i, funcDef)
+      val paramCode = code(n)
+
+      def foldFunc(choiceInformation: (Option[Int], Option[Int], PresenceCondition), child: Ast): Ast = {
+        val (c, l, p) = choiceInformation
+        val choiceNode = NewControlStructure()
+          //        .parserTypeName(Choice.getSimpleName)
+          .controlStructureType(ControlStructureTypes.CHOICE)
+          .code(paramCode)
+          .lineNumber(l)
+          .columnNumber(c)
+        val presenceConditionMap: Map[String, String] =Map("AST1" -> p.toString)
+        val presenceConditionMapSerialized = presenceConditionMap.asJson.noSpaces
+        choiceNode.presenceCondition(presenceConditionMapSerialized)
+        val presenceConditionEdges = Seq(AstEdge(choiceNode, child.root.get))
+        Ast(
+          nodes = Seq(choiceNode) ++ child.nodes ,
+          edges = child.edges ++ presenceConditionEdges,
+          conditionEdges = child.conditionEdges,
+          argEdges = child.argEdges,
+          receiverEdges = child.receiverEdges ,
+          refEdges = child.refEdges ,
+          bindsEdges = child.bindsEdges ,
+          captureEdges = child.captureEdges
+        )
+      }
+
+      println(i)
+      path.foldRight(parameterNode)(foldFunc)
+    }
+    
     methodAst(
       methodNode_,
-      newParameterAsts,
+      parameterAsts,
       blockAst_,
       methodReturnNode(funcDef, returnType),
       modifiers = List()
