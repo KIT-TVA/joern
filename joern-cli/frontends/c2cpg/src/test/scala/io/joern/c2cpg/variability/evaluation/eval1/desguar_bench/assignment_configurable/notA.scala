@@ -1,4 +1,4 @@
-package io.joern.c2cpg.variability.evaluation.eval1.desguar_bench.increment_decrement
+package io.joern.c2cpg.variability.evaluation.eval1.desguar_bench.assignment_configurable
 
 import io.joern.c2cpg.astcreation.{CGlobal, VAstCreator}
 import io.joern.c2cpg.testfixtures.C2CpgSuite
@@ -16,19 +16,23 @@ import superc.SuperC
 
 import java.io.{File, StringReader}
 
-class ADefined extends C2CpgSuite(withOssDataflow = true) {
+class notA extends C2CpgSuite(withOssDataflow = true) {
   implicit val semantics: Semantics = DefaultSemantics()
   val cCode =
     """
-   int main() {
-  int x;
-  if (x) {
-    x++;
-  } else {
-  }
+int main() {
+  int a;
+
+
+  a = 1;
+
+
+
   return 0;
 }
-    }
+ */
+
+
     """
   val cCpg = code(cCode)
   var cTraversal = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
@@ -42,9 +46,10 @@ class ADefined extends C2CpgSuite(withOssDataflow = true) {
   println()
 
   cTraversal = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
-   val cCfgDotString = DotCfgGenerator.dotCfg(cTraversal)
-   println("Standard Joern C Cfg:")
-   println(cCfgDotString.mkString)
+  val cCfgDotString = DotCfgGenerator.dotCfg(cTraversal)
+  println("Standard Joern C Cfg:")
+  println(cCfgDotString.mkString)
+
 
   println()
   println()
@@ -55,5 +60,4 @@ class ADefined extends C2CpgSuite(withOssDataflow = true) {
   val cPdgDotString = DotPdgGenerator.toDotPdg(cTraversal)
   println("Standard Joern C PDG:")
   println(cPdgDotString.mkString)
-
 }

@@ -1,4 +1,4 @@
-package io.joern.c2cpg.variability.evaluation.eval1.desguar_bench.function_parameter_multiple_config
+package io.joern.c2cpg.variability.evaluation.eval1.desguar_bench.assignment_configurable
 
 import io.joern.c2cpg.astcreation.{CGlobal, VAstCreator}
 import io.joern.c2cpg.testfixtures.C2CpgSuite
@@ -20,37 +20,18 @@ class Variable extends C2CpgSuite(withOssDataflow = true) {
   implicit val semantics: Semantics = DefaultSemantics()
   val cCode =
     """
-int foo(
-#ifdef A
-#ifdef B
-        int x,
-        #endif
-        #endif
-        #ifdef A
-        #ifdef C
-        int y,
-        #endif
-        #endif
-        #ifdef A
-        int z,
-        #endif
-        int w)
-{
+int main() {
+  int a;
+
+  #ifdef A
+  a = 0;
+  #else
+  a = 1;
+  #endif
+
+
   return 0;
 }
-
-int main(int x)
-{
-  return 0;
-}
-
-/*
-  foo(w)                  -!A && (!B || B) && (!C || C)
-  foo(x,z,w)              -A && B && !C
-  foo(y,z,w)              -A && !B && C
-  foo(x,y,z,w)            -A && B && C
-  foo(z,w)                -A && !B && !C
- */
 
 
     """

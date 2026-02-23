@@ -148,6 +148,7 @@ class VAstCreator(
         node.getNode(0).getName match {
           case "FunctionCall" => Seq(astForFunctionCall(node))
           case "Increment" | "Decrement" => Seq(astForUnaryExpression(node.getNode(0)))
+          case "AssignmentExpression" => Seq(astForAssignmentExpression(node.getNode(0)))
           case _ => Seq(Ast())
         }
       case node => Seq(Ast()) //getChildren(node).map(convertXTCNodeToJoern).head
@@ -205,6 +206,22 @@ class VAstCreator(
  AttributeSpecifierListOpt(),
 
  InitializerOpt())*/
+  
+  private def astForAssignmentExpression(expr: Node): Ast = {
+    val leftAst = astForXtcNode(expr.getNode(0)).head
+    val rightAst = astForXtcNode(expr.getNode(2)).head
+    val assignmentCallNode = callNode(
+      expr,
+      code(expr),
+      Operators.assignment,
+      Operators.assignment,
+      DispatchTypes.STATIC_DISPATCH,
+      None,
+      Some(Defines.Void)
+      //      Some(registerType(Defines.Void))
+    )
+    callAst(assignmentCallNode, List(leftAst, rightAst))
+  }
 
   private def astsForDeclarationList(declaration: Node): Seq[Ast] = {
     // We do not support int x, y = 5;

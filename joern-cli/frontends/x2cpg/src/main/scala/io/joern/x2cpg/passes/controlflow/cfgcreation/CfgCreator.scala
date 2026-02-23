@@ -76,7 +76,7 @@ class CfgCreator(entryNode: Method, diffGraph: DiffGraphBuilder) {
   private def cfgForMethod(node: Method): Cfg = {
     //TODO: Children of the method node that are choice nodes, can only contain parameters. And Parameters should create an empty CFG, which is why we remove them here. This is not an elegant solution and should be fixed in the future!
     // 
-    //    cfgForSingleNode(node) ++ cfgForChildren(node)
+//        cfgForSingleNode(node) ++ cfgForChildren(node)
     cfgForSingleNode(node) ++ node.astChildren.filter(_.properties.getOrElse("PRESENCE_CONDITION", "") == "").l.map(cfgFor).reduceOption((x, y) => x ++ y).getOrElse(Cfg.empty)
   }
 

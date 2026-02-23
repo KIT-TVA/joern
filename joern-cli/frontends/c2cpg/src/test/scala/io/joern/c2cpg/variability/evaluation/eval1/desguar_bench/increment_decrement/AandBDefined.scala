@@ -32,19 +32,20 @@ int main() {
 
     """
   val cCpg = code(cCode)
-  val cTraversal = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
-//  val cAstDotString = DotAstGenerator.dotAst(cTraversal)
+  var cTraversal = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
+  val cAstDotString = DotAstGenerator.dotAst(cTraversal)
   println("Standard Joern C Ast:")
-//  println(cAstDotString.mkString)
+  println(cAstDotString.mkString)
 
   println()
   println()
   println()
   println()
 
- /* val cCfgDotString = DotCfgGenerator.dotCfg(cTraversal)
+  cTraversal = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
+  val cCfgDotString = DotCfgGenerator.dotCfg(cTraversal)
   println("Standard Joern C Cfg:")
-  println(cCfgDotString.mkString)*/
+  println(cCfgDotString.mkString)
 
 
   println()
@@ -52,6 +53,7 @@ int main() {
   println()
   println()
 
+  cTraversal = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
   val cPdgDotString = DotPdgGenerator.toDotPdg(cTraversal)
   println("Standard Joern C PDG:")
   println(cPdgDotString.mkString)
