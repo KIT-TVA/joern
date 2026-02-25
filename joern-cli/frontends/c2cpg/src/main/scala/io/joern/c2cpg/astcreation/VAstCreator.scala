@@ -134,7 +134,8 @@ class VAstCreator(
           case "if" => Seq(astForIf(node))
           case _ => Seq(Ast())
         }
-      case "ParameterTypeList"  => getChildren(node).flatMap(astForXtcNode)
+        // We handle parameters directly in the astformethod function
+/*      case "ParameterTypeList"  => getChildren(node).flatMap(astForXtcNode)
       case "ParameterList" =>
         val params = getChildren(node).flatMap(astForXtcNode)
         if (params.size > 1) {
@@ -142,7 +143,7 @@ class VAstCreator(
         }
         else {
           Seq(params.head)
-        }
+        }*/
 //      case "ParameterIdentifierDeclaration" => Seq(astForParameter(node))
       case "ExpressionStatement" =>
         node.getNode(0).getName match {
@@ -724,13 +725,15 @@ class VAstCreator(
     val condAst = astForXtcNode(ifStmt.getNode(1)).head
     val thenAst = astForXtcNode(ifStmt.getNode(2)).head
 
+    if(ifStmt.size == 5){
+      val elseNode = controlStructureNode(ifStmt.getNode(4), ControlStructureTypes.ELSE, "else")
+      val elseAst = astForXtcNode(ifStmt.getNode(4)).head
 
-    val elseNode = controlStructureNode(ifStmt.getNode(4), ControlStructureTypes.ELSE, "else")
-    val elseAst = ifStmt.size match {
-      case 5 => astForXtcNode(ifStmt.getNode(4)).head
-      case _ => Ast()
+      controlStructureAst(ifNode, Option(condAst), Seq(thenAst, Ast(elseNode).withChild(elseAst)))
     }
-    controlStructureAst(ifNode, Option(condAst), Seq(thenAst, Ast(elseNode).withChild(elseAst)))
+    else{
+      controlStructureAst(ifNode, Option(condAst), Seq(thenAst))
+    }
   }
 
   //TODO: line number, column number und code + wenn left and right ast equal => einen kann man entfernen?
