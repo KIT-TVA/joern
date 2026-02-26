@@ -28,7 +28,7 @@ class PdgPresenceConditionAnnotationPass(cpg: Cpg) extends ForkJoinParallelCpgPa
             val presenceConditionMap = decode[Map[String, String]](jsonString).getOrElse(Map.empty)
 
             val dstLocationString = calculateStoredNodeId(dst.asInstanceOf[StoredNode])
-            val t = presenceConditionMap.getOrElse(dstLocationString, presenceConditionMap.getOrElse("UNKNOWN", "ERROR"))
+            val t = presenceConditionMap.getOrElse(dstLocationString, presenceConditionMap.getOrElse("UNKNOWN", ""))
             t
           case _ => ""
         }

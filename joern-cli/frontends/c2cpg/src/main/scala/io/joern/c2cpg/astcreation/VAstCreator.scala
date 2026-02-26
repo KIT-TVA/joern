@@ -756,11 +756,80 @@ class VAstCreator(
       astForXtcNode(choiceStatement.getNode(1))
     }
     else {
-      val choiceNode = controlStructureNode(choiceStatement, ControlStructureTypes.CHOICE, code(choiceStatement))
-      val leftAst = astForXtcNode(choiceStatement.getNode(1)).head
-      var rightAst = Ast()
 
-      val leftId = calculateAstNodeId(leftAst.root.get)
+      var negatedPresenceCondition: Option[PresenceCondition] = None
+
+      var leftAsts = astForXtcNode(choiceStatement.getNode(1))
+      var rightAsts: Seq[Ast] = Seq()
+      if (choiceStatement.size() == 4) {
+        rightAsts = astForXtcNode(choiceStatement.getNode(3))
+        negatedPresenceCondition = choiceStatement.get(2) match {
+          case pc: PresenceCondition => Some(pc)
+        }
+      }
+
+      val maxLen = math.max(leftAsts.length, rightAsts.length)
+      leftAsts = leftAsts ++ Seq.fill(maxLen - leftAsts.length)(Ast())
+      rightAsts = rightAsts ++ Seq.fill(maxLen - rightAsts.length)(Ast())
+
+
+      val choiceAsts = leftAsts.zip(rightAsts).map{
+        case (leftAst, rightAst) =>
+          val choiceNode = controlStructureNode(choiceStatement, ControlStructureTypes.CHOICE, code(choiceStatement))
+          var presenceConditionMap: Map[String, String] = Map()
+          if(leftAst == Ast()){
+            presenceConditionMap =
+              Map("AST1" -> negatedPresenceCondition.get.toString) + ("UNKNOWN" -> presenceCondition.not().toString)
+          }
+          else{
+            if (rightAst == Ast()){
+              presenceConditionMap =
+                Map("AST1" -> presenceCondition.toString) + ("UNKNOWN" -> presenceCondition.not().toString)
+            }
+            else{
+              presenceConditionMap =
+                Map("AST1" -> presenceCondition.toString) + ("AST2" -> negatedPresenceCondition.get.toString)
+            }
+          }
+
+          var presenceConditionEdges: Seq[AstEdge] = Seq()
+          if(leftAst != Ast()){
+
+            presenceConditionEdges = Seq(AstEdge(choiceNode, leftAst.root.get))
+          }
+          if (rightAst != Ast()) {
+
+            presenceConditionEdges = presenceConditionEdges :+ AstEdge(choiceNode, rightAst.root.get)
+          }
+          val presenceConditionMapSerialized = presenceConditionMap.asJson.noSpaces
+          choiceNode.presenceCondition(presenceConditionMapSerialized)
+
+          var returnAst = Ast(
+            nodes = Seq(choiceNode) ++ leftAst.nodes ++ rightAst.nodes,
+            edges = leftAst.edges ++ rightAst.edges ++ presenceConditionEdges,
+            conditionEdges = leftAst.conditionEdges ++ rightAst.conditionEdges, //++ Seq(AstEdge(choiceNode, choiceNode)), //TODO: ++ presenceConditionEdges?
+            argEdges = leftAst.argEdges ++ rightAst.argEdges,
+            receiverEdges = leftAst.receiverEdges ++ rightAst.receiverEdges,
+            refEdges = leftAst.refEdges ++ rightAst.refEdges,
+            bindsEdges = leftAst.bindsEdges ++ rightAst.bindsEdges,
+            captureEdges = leftAst.captureEdges ++ rightAst.captureEdges
+          )
+          // This should just evaluate to true in the case of
+          //                                          Choice
+          //                             (macro, node)      (!macro, node)
+          // where we can just replace the choice node with one of its child nodes.
+          if (leftAst != Ast() && rightAst != Ast()) {
+            val rightId = calculateAstNodeId(rightAst.root.get)
+            val leftId = calculateAstNodeId(leftAst.root.get)
+            if (rightId == leftId) {
+              returnAst = leftAst
+            }
+          }
+          returnAst
+
+      }
+      choiceAsts
+      /*val leftId = calculateAstNodeId(leftAst.root.get)
       var presenceConditionMap: Map[String, String] =
         Map("AST1" -> presenceCondition.toString)
       //        Map(leftId -> presenceCondition.toString)
@@ -803,7 +872,7 @@ class VAstCreator(
         refEdges = leftAst.refEdges ++ rightAst.refEdges,
         bindsEdges = leftAst.bindsEdges ++ rightAst.bindsEdges,
         captureEdges = leftAst.captureEdges ++ rightAst.captureEdges
-      ))
+      ))*/
 
       //      controlStructureAst(choiceNode, Option(choiceNode), Seq())
 
