@@ -1,4 +1,133 @@
-Joern - The Bug Hunter's Workbench
+# SuperJoern Install Guide
+## Preliminaries:
+- Git
+- IntelliJ (tested with 2025.1.4.1)
+
+- Install SBT and JDK (tested with 1.11.3 (Ubuntu Java 21.0.9)):
+```
+    sudo apt-get update
+    
+    sudo apt-get install apt-transport-https curl gnupg -yqq
+    
+    echo "deb https://repo.scala-sbt.org/scalasbt/debian all main" | sudo tee /etc/apt/sources.list.d/sbt.list
+    
+    echo "deb https://repo.scala-sbt.org/scalasbt/debian /" | sudo tee /etc/apt/sources.list.d/sbt_old.list
+    
+    curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" | sudo -H gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalasbt-release.gpg --import
+    
+    sudo chmod 644 /etc/apt/trusted.gpg.d/scalasbt-release.gpg
+    
+    sudo apt-get update
+    
+    sudo apt-get install sbt
+    
+    sudo apt install openjdk-21-jdk
+```
+
+
+## Install:
+1. Clone our Joern Project:
+```
+    git clone https://github.com/KIT-TVA/joern.git
+```
+
+
+2. Go into the joern directory
+```
+    cd joern/
+```
+
+
+3. Clone our SuperC project into Joern
+```
+    git clone git@gitlab.kit.edu:kit/tva/baechle/student-work/master/2026-ma-dormann-superc.git
+```
+
+
+4. Rename the superC project:
+```
+    mv 2026-ma-dormann-superc/ superc
+```
+
+
+5. Install libaries required by superC and copy them into the bin directory
+```
+    sudo apt-get install -y libz3-java=4.8.12-3.1build1 libjson-java sat4j bison
+    
+    cd superc
+    
+    cp /usr/share/java/org.sat4j.core.jar /usr/share/java/com.microsoft.z3-4.8.12.0.jar /usr/share/java/json-lib.jar bin
+```
+
+
+
+5. Clone our CodePropertyGraph project
+```
+    cd ../..
+    
+    git clone https://github.com/KIT-TVA/codepropertygraph.git
+
+  
+
+    cd codepropertygraph/
+
+    sudo apt install git-lfs
+    
+    git lfs pull
+```
+
+
+
+6. Compile and publish the CodePropertyGraph project locally
+```
+    sbt clean test publishM2
+```
+
+
+7. Go back into the Joern directory
+```
+    cd ../joern
+```
+
+
+8. Open the SBT console
+```
+    sbt
+```
+
+
+9. Compile the project and keep the SBT console open!
+```
+    compile
+```
+
+
+10. With the SBT console open, open the Joern Project in IntelliJ. When prompted to either use SBT or BSP import, select BSP.
+
+
+
+11. Once IntelliJ finished the import, you can close the sbt console and should be able to compile the project in IntelliJ.
+
+
+## Usage & Development
+The SuperC frontend is implemented as part of the C frontend. 
+The implementation of the frontend is located at ```joern/joern-cli/frontends/c2cpg/src/main/scala/io.joern.c2cpg/astcreation/VAstCreator```.
+The corresponding tests are located at ```joern/joern-cli/frontends/c2cpg/src/main/test/scala/io.joern.c2cpg/variability```.
+Furthermore changes to the derivation process of the CFG have been made in ```src/main/scala/io/joern/x2cpg/passes/controlflow/cfgcreation/CfgCreator.scala``` and the PDG annotation pass is located at ```src/main/scala/io/joern/c2cpg/passes/variability/PdgPresenceConditionAnnotationPass.scala```.   
+
+
+
+
+
+
+
+
+
+
+
+
+
+Standard Joern's original readme: Joern - The Bug Hunter's Workbench
 ===
 
 [![release](https://github.com/joernio/joern/actions/workflows/release.yml/badge.svg)](https://github.com/joernio/joern/actions/workflows/release.yml)
