@@ -1,7 +1,7 @@
 # SuperJoern Install Guide
 ## Preliminaries:
 - Git
-- IntelliJ (tested with 2025.1.4.1)
+- IntelliJ (tested with 2025.1.4.1) with the Scala plugin installed
 
 - Install SBT and JDK (tested with 1.11.3 (Ubuntu Java 21.0.9)):
 ```
