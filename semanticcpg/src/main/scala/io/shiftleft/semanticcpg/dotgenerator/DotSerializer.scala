@@ -80,14 +80,15 @@ object DotSerializer {
   }
 
 
-  def dotGraph(root: Option[AstNode] = None, graph: Graph, withEdgeTypes: Boolean = false): String = {
+  def dotGraph(root: Option[AstNode] = None, graph: Graph,
+               withEdgeTypes: Boolean = false, extended_view: Boolean = false): String = {
     val sb = root match {
       case Some(r) => namedGraphBegin(r)
       case None => defaultGraphBegin()
     }
 
     sb.append(s"""node [shape="rect"];  \n""")
-    val nodeStrings = graph.vertices.map(nodeToDot)
+    val nodeStrings = graph.vertices.map(node => nodeToDot(node, extended_view))
     val edgeStrings = graph.edges.map(e => edgeToDot(e, withEdgeTypes))
     val subgraphStrings = graph.subgraph.zipWithIndex.map { case ((subgraph, nodes), idx) =>
       nodesToSubGraphs(subgraph, nodes, idx)
@@ -153,8 +154,67 @@ object DotSerializer {
     }
   }
 
-  private def nodeToDot(node: StoredNode): String = {
-    s""""${node.id}" [label = <${stringRepr(node)}> ]""".stripMargin
+  private def nodeToDot(node: StoredNode, extended_view: Boolean = false): String = {
+    if (extended_view) {
+      val className: String = node.getClass.toString.replace("<", "&lt;").replace(">", "&gt;")
+      var debugParam = "Debug parameters:"
+      for (entry <- node._debugChildren()) {
+        val newP = entry match {
+          case e if e.toString.startsWith("AST") => ""
+          case e if e.toString.startsWith("CFG") => ""
+          case e if e.toString.startsWith("CPG") => ""
+          case e if e.toString.startsWith("CDG") => ""
+          case e if e.toString.startsWith("REF") => ""
+          case e if e.toString.startsWith("CALL") => ""
+          case e if e.toString.startsWith("PARAMETER_LINK") => ""
+          case e if e.toString.startsWith("REACHING_DEF") => ""
+          case e if e.toString.startsWith("CONTAINS") => ""
+          case e if e.toString.startsWith("EVAL_TYPE") => ""
+          case e if e.toString.startsWith("DOMINATE") => ""
+          case e if e.toString.startsWith("POST_DOMINATE") => ""
+          case e if e.toString.startsWith("ARGUMENT") => ""
+          case e => "<br/> - \"" + e.toString.replace("<", "&lt;").replace(">", "&gt;").replace("\n", "\\n") + "\""
+        }
+        debugParam = debugParam + newP
+      }
+
+      val style: String = node match {
+        case n: Method => " color=\"#8cb63c\" style=filled fillcolor=\"#e8f5d8\""
+        case n: MethodParameterIn => " color=\"#8cb63c\" style=filled fillcolor=\"#e8f5d8\""
+        case n: MethodReturn => " color=\"#8cb63c\" style=filled fillcolor=\"#e8f5d8\""
+        case n: Call =>
+          if (n._debugChildren().exists(e => e.toString.startsWith("NAME=<"))) {
+            ""
+          } else {
+            " color=\"#009682\" style=filled fillcolor=\"#d9f1e6\""
+          }
+        case n: Return => " color=\"#23a1e0\" style=filled fillcolor=\"#dcf2fb\""
+        case n: JumpTarget =>
+          if (n._debugChildren().exists(e => e.toString.startsWith("PARSER_TYPE_NAME=CASTLabelStatement"))) {
+            " color=\"#a97e23\" style=filled fillcolor=\"#f0e6d2\""
+          } else {
+            " color=\"#4664AA\" style=filled fillcolor=\"#e0e3f4\""
+          }
+        case n: Literal => " color=\"#df9b1b\" style=filled fillcolor=\"#fdecd2\""
+        case n: Identifier => " color=\"#df9b1b\" style=filled fillcolor=\"#fdecd2\""
+        case n: ControlStructure =>
+          if (n._debugChildren().exists(e => e.toString.startsWith("CONTROL_STRUCTURE_TYPE=GOTO"))) {
+            " color=\"#a97e23\" style=filled fillcolor=\"#f0e6d2\""
+          } else if (n._debugChildren().exists(e => e.toString.startsWith("CONTROL_STRUCTURE_TYPE=BREAK"))) {
+            " color=\"#23a1e0\" style=filled fillcolor=\"#dcf2fb\""
+          } else if (n._debugChildren().exists(e => e.toString.startsWith("CONTROL_STRUCTURE_TYPE=CONTINUE"))) {
+            " color=\"#23a1e0\" style=filled fillcolor=\"#dcf2fb\""
+          } else {
+            " color=\"#4664AA\" style=filled fillcolor=\"#e0e3f4\""
+          }
+        case _ => ""
+      }
+
+      s""""${node.id}" [label = <${className}<br/><b>${stringRepr(node)}</b><br/>${debugParam}> ${style}]""".stripMargin
+    } else {
+      println("small")
+      s""""${node.id}" [label = <${stringRepr(node)}> ]""".stripMargin
+    }
   }
 
   private def edgeToDot(edge: Edge, withEdgeTypes: Boolean): String = {
