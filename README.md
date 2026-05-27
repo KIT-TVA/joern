@@ -56,6 +56,7 @@
     
     cd superc
     
+    # Please check if all 3 libraries are named the same. If not, update the names in the following command.
     cp /usr/share/java/org.sat4j.core.jar /usr/share/java/com.microsoft.z3-4.8.12.0.jar /usr/share/java/json-lib.jar bin
 ```
 
