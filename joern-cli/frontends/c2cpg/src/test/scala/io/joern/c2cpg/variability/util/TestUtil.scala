@@ -27,9 +27,16 @@ import java.io.{File, StringReader}
 
 object TestUtil {
 
+  val JOERN_METHOD_NODE_KIND_ID: Int = 25
+
   def generateVASTDot(cCode: String): (String, String) = {
-    val (superCDotGraph, vcpg) = generateVCPG(cCode, onlyVAST=true)
+    val (superCDotGraph, vcpg) = generateVCPG(cCode, cFileName=None, onlyVAST=true)
     (superCDotGraph, DotAstGenerator.dotAst(vcpg, extended_view=true).mkString)
+  }
+
+  def generateVASTDot(cCode: String, cFileName: String): (String, String) = {
+    val (superCDotGraph, vcpg) = generateVCPG(cCode, cFileName=Option(cFileName), onlyVAST=true)
+    (superCDotGraph, DotAstGenerator.dotAst(vcpg, extended_view = true).mkString)
   }
 
   def generateVCFGDot(cCode: String): (String, String) = {
@@ -53,11 +60,11 @@ object TestUtil {
     (superCDotGraph, DotCpg14Generator.toDotCpg14(vcpg).mkString)
   }
 
-  def generateVCPG(cCode: String, onlyVAST: Boolean = true):  (String, Iterator[Method]) = {
+  def generateVCPG(cCode: String, cFileName: Option[String] = None, onlyVAST: Boolean = true):  (String, Iterator[Method]) = {
     implicit val semantics: Semantics = DefaultSemantics()
     val stringReader = new StringReader(cCode)
 
-    val dummyFile = new File("test.c")
+    val dummyFile = if (cFileName.isDefined) new File(cFileName.get) else new File("test.c")
     val sup = new SuperC()
     sup.init()
     sup.prepare()
@@ -75,7 +82,8 @@ object TestUtil {
     val globalSuperC: CGlobal = new CGlobal()
 
     // Converts the SuperC VAST into a JOERN VAST.
-    val vAstCreator = VAstCreator("test.c", globalSuperC, superCParseResult)
+    val vAstCreator = VAstCreatorNew("test.c", globalSuperC, superCParseResult)
+    //val vAstCreator = VAstCreator("test.c", globalSuperC, superCParseResult)
     val diffGraph: DiffGraphBuilder = vAstCreator.createAst() // Baut JOERN-Graph (Diff Graph builder) | Haut SuperC-VAST in JOERN Datenbank | Kein JOERN-Datenstrukur bauen
 
     flatgraph.DiffGraphApplier.applyDiff(superCpg.graph, diffGraph)
@@ -89,7 +97,7 @@ object TestUtil {
     }
 
     // Gibt den SuperC-VAST als Dot-Graph zurück und
-    (superCDotGraph, superCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]])
+    (superCDotGraph, superCpg.graph._nodes(JOERN_METHOD_NODE_KIND_ID).asInstanceOf[Iterator[nodes.Method]])
   }
 
   /**
