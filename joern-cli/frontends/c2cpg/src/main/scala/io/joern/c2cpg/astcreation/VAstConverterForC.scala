@@ -6,6 +6,7 @@ class VAstConverterForC(private var vAstCreator: VAstCreatorNew) extends VAstCon
   private val patterns: List[VAstPatternConverter] = List.apply(
     new VAstPatternConverterForBinaryOperators(vAstCreator, this),
     new VAstPatternConverterForConditionalMacro(vAstCreator, this),
+    new VAstPatternConverterForFunctionDeclaration(vAstCreator, this),
     new VAstPatternConverterForSuperCRoot(vAstCreator, this),
     new VAstPatternConverterForVariableDeclaration(vAstCreator, this)
   )
