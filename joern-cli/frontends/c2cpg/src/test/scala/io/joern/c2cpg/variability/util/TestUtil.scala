@@ -1,6 +1,6 @@
 package io.joern.c2cpg.variability.util
 
-import io.joern.c2cpg.astcreation.{CGlobal, VAstCreator}
+import io.joern.c2cpg.astcreation.{CGlobal, VAstCreatorNew}
 import io.joern.c2cpg.parser.FileDefaults
 import io.joern.c2cpg.passes.variability.PdgPresenceConditionAnnotationPass
 import io.joern.c2cpg.testfixtures.{AstC2CpgSuite, C2CpgSuite, CDefaultTestCpg}
@@ -27,16 +27,30 @@ import java.io.{File, StringReader}
 
 object TestUtil {
 
-  val JOERN_METHOD_NODE_KIND_ID: Int = 25
+  private val JOERN_METHOD_NODE_KIND_ID: Int = 25
+  private val GLOBAL_DOT_GRAPH_IDENTIFIER: String = "&lt;global&gt;"
 
-  def generateVASTDot(cCode: String): (String, String) = {
-    val (superCDotGraph, vcpg) = generateVCPG(cCode, cFileName=None, onlyVAST=true)
-    (superCDotGraph, DotAstGenerator.dotAst(vcpg, extended_view=true).mkString)
-  }
+  def generateVASTDot(cCode: String): (String, String) = 
+    generateVASTDot(cCode, None, false)
 
-  def generateVASTDot(cCode: String, cFileName: String): (String, String) = {
-    val (superCDotGraph, vcpg) = generateVCPG(cCode, cFileName=Option(cFileName), onlyVAST=true)
-    (superCDotGraph, DotAstGenerator.dotAst(vcpg, extended_view = true).mkString)
+  def generateVASTDot(cCode: String, cFileName: String): (String, String) = 
+    generateVASTDot(cCode, Option(cFileName), false)
+
+  def generateVASTDot(cCode: String, onlyGlobalGraph: Boolean): (String, String) = 
+    generateVASTDot(cCode, None, onlyGlobalGraph)
+
+  def generateVASTDot(cCode: String, cFileName: String, onlyGlobalGraph: Boolean): (String, String) = 
+    generateVASTDot(cCode, Option(cFileName), onlyGlobalGraph)
+
+  def generateVASTDot(cCode: String, cFileName: Option[String], onlyGlobalGraph: Boolean): (String, String) = {
+    val (superCDotGraph, vcpg) = generateVCPG(cCode, cFileName = cFileName, onlyVAST = true)
+    val astDotGraphs: Iterator[String] = DotAstGenerator.dotAst(vcpg, extended_view = true)
+    if (onlyGlobalGraph) {
+      (superCDotGraph,
+        astDotGraphs.filter(dotGraph => dotGraph.startsWith(s"digraph \"$GLOBAL_DOT_GRAPH_IDENTIFIER\" {")).mkString)
+    } else {
+      (superCDotGraph, astDotGraphs.mkString)
+    }
   }
 
   def generateVCFGDot(cCode: String): (String, String) = {
@@ -74,6 +88,7 @@ object TestUtil {
 
     // Converts the SuperC VAST data structure into a dot graph.
     val superCDotGraph: String = superCGraphToDotGraph(superCParseResult)
+    println(superCDotGraph)
 
     // General preparations for JOERN.
     val superCpg = newEmptyCpg(None)
