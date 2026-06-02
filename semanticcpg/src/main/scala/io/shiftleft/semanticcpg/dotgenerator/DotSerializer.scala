@@ -156,7 +156,7 @@ object DotSerializer {
 
   private def nodeToDot(node: StoredNode, extended_view: Boolean = false): String = {
     if (extended_view) {
-      val className: String = node.getClass.toString.replace("<", "&lt;").replace(">", "&gt;")
+      val className: String = node.getClass.toString.replace("<", "&lt;").replace(">", "&gt;").replace("&", "\t&amp;")
       var debugParam = "Debug parameters:"
       for (entry <- node._debugChildren()) {
         val newP = entry match {
@@ -173,7 +173,13 @@ object DotSerializer {
           case e if e.toString.startsWith("DOMINATE") => ""
           case e if e.toString.startsWith("POST_DOMINATE") => ""
           case e if e.toString.startsWith("ARGUMENT") => ""
-          case e => "<br/> - \"" + e.toString.replace("<", "&lt;").replace(">", "&gt;").replace("\n", "\\n") + "\""
+          case e =>
+            val debugParameters: String  = e.toString
+              .replace("<", "&lt;")
+              .replace(">", "&gt;")
+              .replace("&", "\t&amp;")
+              .replace("\n", "\\n")
+            s"<br/> - \"$debugParameters\""
         }
         debugParam = debugParam + newP
       }
@@ -204,15 +210,18 @@ object DotSerializer {
             " color=\"#23a1e0\" style=filled fillcolor=\"#dcf2fb\""
           } else if (n._debugChildren().exists(e => e.toString.startsWith("CONTROL_STRUCTURE_TYPE=CONTINUE"))) {
             " color=\"#23a1e0\" style=filled fillcolor=\"#dcf2fb\""
+          } else if (n._debugChildren().exists(e => e.toString.startsWith("CONTROL_STRUCTURE_TYPE=CHOICE"))) {
+            " color=\"#a3107c\" style=filled fillcolor=\"#f2d6ed\""
           } else {
             " color=\"#4664AA\" style=filled fillcolor=\"#e0e3f4\""
           }
         case _ => ""
       }
 
-      s""""${node.id}" [label = <${className}<br/><b>${stringRepr(node)}</b><br/>${debugParam}> ${style}]""".stripMargin
+      var nodeInformation: String = stringRepr(node)
+      if (nodeInformation.isEmpty) nodeInformation = " "
+      s""""${node.id}" [label = <${className}<br/><b>${nodeInformation}</b><br/>${debugParam}> ${style}]""".stripMargin
     } else {
-      println("small")
       s""""${node.id}" [label = <${stringRepr(node)}> ]""".stripMargin
     }
   }
