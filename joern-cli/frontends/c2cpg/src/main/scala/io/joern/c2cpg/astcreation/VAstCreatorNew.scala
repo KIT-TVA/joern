@@ -4,7 +4,7 @@ import io.joern.c2cpg.astcreation.converter.VAstConverter
 import io.joern.x2cpg.datastructures.VariableScopeManager
 import io.joern.x2cpg.{Ast, AstCreatorBase, AstNodeBuilder, Defines, ValidationMode}
 import io.shiftleft.codepropertygraph.generated.{Cpg, DiffGraphBuilder, PropertyDefaults}
-import io.shiftleft.codepropertygraph.generated.nodes.{NewBlock, NewControlStructure, NewFile, NewLocal, NewMethod, NewMethodReturn, NewModifier, NewNode, NewReturn}
+import io.shiftleft.codepropertygraph.generated.nodes.{NewBlock, NewCall, NewControlStructure, NewFile, NewLocal, NewMethod, NewMethodReturn, NewModifier, NewNode, NewReturn}
 import org.slf4j.{Logger, LoggerFactory}
 import xtc.tree.Node
 
@@ -137,5 +137,17 @@ class VAstCreatorNew(
     returnNodeCreator(node, code, line, column)
   }
 
-  
+  def callNodeHelper(
+    node: Node,
+    code: String,
+    name: String,
+    methodFullName: String,
+    dispatchType: String,
+    signature: Option[String],
+    typeFullName: Option[String],
+    line: Option[Int] = None,
+    column: Option[Int] = None
+  ): NewCall = {
+    callNodeCreator(node, code, name, methodFullName, dispatchType, signature, typeFullName, line, column)
+  }
 }

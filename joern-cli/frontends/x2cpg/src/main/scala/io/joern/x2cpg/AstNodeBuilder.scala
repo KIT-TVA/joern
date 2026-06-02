@@ -231,6 +231,30 @@ trait AstNodeBuilder[Node, NodeProcessor] { this: NodeProcessor =>
     setOffset(node, node_)
   }
 
+  def callNodeCreator(
+    node: Node,
+    code: String,
+    name: String,
+    methodFullName: String,
+    dispatchType: String,
+    signature: Option[String],
+    typeFullName: Option[String],
+    line: Option[Int] = None,
+    column: Option[Int] = None
+  ): NewCall = {
+    val node_ =
+      NewCall()
+        .code(code)
+        .name(name)
+        .methodFullName(methodFullName)
+        .dispatchType(dispatchType)
+        .lineNumber(line)
+        .columnNumber(column)
+    signature.foreach { s => node_.signature(s) }
+    typeFullName.foreach { t => node_.typeFullName(t) }
+    setOffset(node, node_)
+  }
+
   protected def operatorCallNode(node: Node, name: String, typeFullName: Option[String]): NewCall = {
     callNode(node, code(node), name, name, DispatchTypes.STATIC_DISPATCH, Option(""), typeFullName)
   }
