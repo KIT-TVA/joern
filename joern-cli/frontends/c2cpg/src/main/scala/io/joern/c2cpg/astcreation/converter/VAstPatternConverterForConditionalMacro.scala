@@ -2,11 +2,11 @@ package io.joern.c2cpg.astcreation.converter
 
 import io.circe.syntax.*
 import io.circe.generic.auto.*
-import io.circe.parser._
+import io.circe.parser.*
 import io.joern.c2cpg.astcreation.VAstCreatorNew
 import io.joern.x2cpg.{Ast, AstEdge}
 import io.shiftleft.codepropertygraph.generated.ControlStructureTypes
-import io.shiftleft.codepropertygraph.generated.nodes.{AstNodeNew, NewControlStructure, NewNode}
+import io.shiftleft.codepropertygraph.generated.nodes.{AstNodeNew, NewBlock, NewControlStructure, NewNode}
 import superc.core.PresenceConditionManager.PresenceCondition
 import xtc.tree.{GNode, Node}
 
@@ -29,7 +29,21 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
   private val CODE_PROPERTY: String = "CODE"
   
   override def convert(superCVAst: Node): Option[Seq[Ast]] = {
-    val handler: ((Node) => Ast) = (node: Node) => converter.convert(node).head
+    val handler: ((Node) => Ast) = (node: Node) => converter.convert(node) match {
+      case asts if (asts.isEmpty) => vAstCreator.AstHelper()
+      case asts if (asts.size == 1) => asts.head
+      case asts =>
+        val astsOfInterested: Seq[Ast] = asts.filter(ast => ast.nodes.nonEmpty)
+        val firstBlockNode: NewNode = astsOfInterested.head.root.get.asInstanceOf[NewNode]
+
+        val line: Int = firstBlockNode.properties("LINE_NUMBER").asInstanceOf[Int]
+        val column: Int = firstBlockNode.properties("COLUMN_NUMBER").asInstanceOf[Int]
+        val code: String = astsOfInterested.map(ast => ast.root.get.properties("CODE").asInstanceOf[String])
+                                           .mkString("\n")
+
+        val blockNode: NewBlock = vAstCreator.blockNodeHelper(superCVAst, code, "<???>", Option(line), Option(column))
+        vAstCreator.blockAstHelper(blockNode, astsOfInterested.toList)
+    }
     val ast: Ast = handelConditional(superCVAst, handler, handler)
     Option(Seq(ast))
   }
@@ -68,14 +82,13 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
                         secondConditionSubtreeCreator: (Node) => Ast): Ast = {
     require(isConditionalNode(conditionalNode),
             s"It as a \"Conditional\" node expected, but a \"${conditionalNode.getName}\" node was passed")
-    converter.convert(conditionalNode.getNode(FIRST_CONDITION_SUBTREE)).head
 
     val firstPresenceCondition: PresenceCondition = conditionalNode.get(FIRST_CONDITION_INFORMATION)
                                                                    .asInstanceOf[PresenceCondition]
 
     if (firstPresenceCondition.toString == NO_CONDITION) {
       // If the condition of the conditional node is always true => ignore conditional node
-      converter.convert(conditionalNode.getNode(FIRST_CONDITION_SUBTREE)).head
+      firstConditionSubtreeCreator(conditionalNode.getNode(FIRST_CONDITION_SUBTREE))
 
     } else {
       // If the conditional node contains a condition.
@@ -105,7 +118,7 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
             val conditionsStrings: Seq[String] = conditions.toSeq
               .filter((key, value) => key.equals("AST1") || key.equals("AST2"))
               .map((key, value) => value)
-            
+
             // Extracts all interesting conditional options.
             val conditionOptions: Seq[String] = if (conditionsStrings.size == 1) {
               Seq(conditionsStrings.head)

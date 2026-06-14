@@ -37,14 +37,15 @@ class testConditionalMacro extends C2CpgSuite(withOssDataflow = true) {
     | // Logical expression combining comparison and AND
     | #if (DEBUG_LEVEL > 1) && (ENABLE_LOGS == 1)
     |   #define LOG_MSG(msg) printf("DEBUG: %s\n", msg)
-    |   float w1;
+    |   float w1 = 42;
     | #else
     |   #define LOG_MSG(msg) // Becomes a blank line, stripping it from build
-    |   float w2;
+    |   float w2 = 41;
     | #endif
     |
     | int main() {
     |   LOG_MSG("System initialized."); // Compiles only if conditions match
+    |   int aaa;
     |   return 0;
     | }
     |""".stripMargin
