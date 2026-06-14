@@ -179,17 +179,24 @@ object TestUtil {
 
   def processSuperCPresenceCondition(node: PresenceCondition, dotGraphNodeID: Int): (String, Int) = {
 
+    val condition: String = node.toString.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    val conditionalExpression: String = s"Condition:<br/>\"<i>${condition}</i>\""
+    
     var allConfigString: String = "Configurations:"
     val allConfigs = node.getAllConfigs.asScala
-    for (config: String <- allConfigs) allConfigString = allConfigString + s"<br/> - \"<i>${config}</i>\""
+    for (config: String <- allConfigs) {
+      val escaped_config: String = config.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+      allConfigString = allConfigString + s"<br/> - \"<i>${escaped_config}</i>\""
+    }
 
     val bdd = node.getBDD
-    val bddToString: String = bdd.toString.replace("<", "&lt;").replace(">", "&gt;")
+    val bddToString: String = bdd.toString.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     val bddToStringWithDomains: String = bdd.toStringWithDomains.replace("<", "&lt;").replace(">", "&gt;")
-    val className: String = node.getClass.toString.replace("<", "&lt;").replace(">", "&gt;")
-    val conditionalNode: String = s"  \"${dotGraphNodeID}\" [label=<${className}<br/>${allConfigString}<br/><br/>" +
-      s"BDD.toString: \"<i>${bddToString}</i>\"<br/>BDD.toStringWithDomains: \"<i>${bddToStringWithDomains}</i>\"<br/>" +
-      "<i>maybe an incomplete subtree</i>> color=\"#a22223\" style=filled fillcolor=\"#f2d5cb\"];\n"
+    val className: String = node.getClass.toString.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    val conditionalNode: String = s"  \"${dotGraphNodeID}\" [label=<${className}<br/>${conditionalExpression}<br/>" +
+      s"${allConfigString}<br/><br/>BDD.toString: \"<i>${bddToString}</i>\"<br/>BDD.toStringWithDomains: \"<i>" +
+      s"${bddToStringWithDomains}</i>\"<br/><i>maybe an incomplete subtree</i>> color=\"#a22223\" style=filled " +
+      "fillcolor=\"#f2d5cb\"];\n"
 
     val subtreeNode = node.tree()
     if (subtreeNode == null) return (conditionalNode, dotGraphNodeID)
@@ -200,6 +207,7 @@ object TestUtil {
   }
 
   def superCGraphToDotGraphHelper(nodeD: Any, dotGraphNodeID: Int): (String, Int) = {
+    require(nodeD != null, "It seems that the C code parsed by SuperC contains a syntax error.")
     nodeD match {
       case node: GNode  => processSuperCNode(node, dotGraphNodeID)
       case node: Syntax => processSuperCNode(node, dotGraphNodeID)
