@@ -150,4 +150,9 @@ class VAstCreatorNew(
   ): NewCall = {
     callNodeCreator(node, code, name, methodFullName, dispatchType, signature, typeFullName, line, column)
   }
+  
+  def controlStructureNodeHelper(node: Node, controlStructureType: String, code: String,
+                                  line: Option[Int] = None, column: Option[Int] = None): NewControlStructure = {
+    controlStructureNodeCreator(node, controlStructureType, code, line, column)
+  }
 }

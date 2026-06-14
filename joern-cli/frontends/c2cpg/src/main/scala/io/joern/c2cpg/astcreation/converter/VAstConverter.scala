@@ -8,6 +8,7 @@ import scala.collection.mutable.ListBuffer
 
 class VAstConverter {
 
+  private var conditionalHandler: Option[VAstConditionalHandler] = None
   private val patternConverters: mutable.Map[String, ListBuffer[VAstPatternConverter]] = mutable.Map.empty
 
   def addPattern(pattern: VAstPatternConverter): Unit = {
@@ -25,6 +26,10 @@ class VAstConverter {
 
   def addPatterns(patterns: List[VAstPatternConverter]): Unit = {
     for (pattern: VAstPatternConverter <- patterns) addPattern(pattern)
+  }
+  
+  def addConditionalHandler(conditionalHandler: VAstConditionalHandler): Unit = {
+    this.conditionalHandler = Option(conditionalHandler)
   }
 
   def convert(superCVAstNode: Node): Seq[Ast] = {
@@ -47,5 +52,10 @@ class VAstConverter {
       }
       asts
     }
+  }
+  
+  def getConditionalHandler: VAstConditionalHandler = {
+    require(conditionalHandler.isEmpty, "No Conditional handler is defined.")
+    conditionalHandler.get
   }
 }
