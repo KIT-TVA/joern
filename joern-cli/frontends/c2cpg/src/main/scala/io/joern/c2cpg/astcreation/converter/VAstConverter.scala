@@ -1,12 +1,14 @@
 package io.joern.c2cpg.astcreation.converter
 
+import io.joern.c2cpg.astcreation.VAstCreatorNew
 import io.joern.x2cpg.Ast
+import io.shiftleft.codepropertygraph.generated.nodes.NewBlock
 import xtc.tree.Node
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
-class VAstConverter {
+class VAstConverter(private val vAstCreator: VAstCreatorNew) {
 
   private var conditionalHandler: Option[VAstConditionalHandler] = None
   private val patternConverters: mutable.Map[String, ListBuffer[VAstPatternConverter]] = mutable.Map.empty
@@ -27,7 +29,7 @@ class VAstConverter {
   def addPatterns(patterns: List[VAstPatternConverter]): Unit = {
     for (pattern: VAstPatternConverter <- patterns) addPattern(pattern)
   }
-  
+
   def addConditionalHandler(conditionalHandler: VAstConditionalHandler): Unit = {
     this.conditionalHandler = Option(conditionalHandler)
   }
@@ -50,12 +52,23 @@ class VAstConverter {
           continueCommand = false
         }
       }
-      asts
+
+      if (asts.isEmpty) {
+        createDummyBlock(superCVAstNode)
+      } else {
+        asts
+      }
     }
   }
-  
+
+  private def createDummyBlock(node: Node): Seq[Ast] = {
+    val blockNode: NewBlock = vAstCreator.blockNodeHelper(node, "", "<dummy block for missing implementaions>", None, None)
+    val ast: Ast = vAstCreator.blockAstHelper(blockNode, List.empty)
+    Seq(ast)
+  }
+
   def getConditionalHandler: VAstConditionalHandler = {
-    require(conditionalHandler.isEmpty, "No Conditional handler is defined.")
+    require(conditionalHandler.isDefined, "No Conditional handler is defined.")
     conditionalHandler.get
   }
 }
