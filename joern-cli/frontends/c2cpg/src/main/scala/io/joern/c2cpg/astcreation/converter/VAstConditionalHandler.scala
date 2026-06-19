@@ -10,8 +10,8 @@ trait VAstConditionalHandler {
                                      secondConditionSubtreeCreator: (Node) => Node): Node
   
   def handelConditional(conditionalNode: Node,
-                        firstConditionSubtreeCreator: (Node) => Ast,
-                        secondConditionSubtreeCreator: (Node) => Ast): Ast
+                        firstConditionSubtreeCreator: (Node) => Seq[Ast],
+                        secondConditionSubtreeCreator: (Node) => Seq[Ast]): Seq[Ast]
   
   def isConditionalNode(node: Node): Boolean
 }
