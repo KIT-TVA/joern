@@ -1,6 +1,6 @@
 package io.joern.c2cpg.astcreation
 
-import io.joern.c2cpg.astcreation.converter.{VAstConverter, VAstPatternConverter, VAstPatternConverterForBinaryOperators, VAstPatternConverterForConditionalMacro, VAstPatternConverterForFunctionDeclaration, VAstPatternConverterForSuperCRoot, VAstPatternConverterForVariableDeclaration}
+import io.joern.c2cpg.astcreation.converter.{VASTPatternConverterForEmptyDefinition, VAstConverter, VAstPatternConverter, VAstPatternConverterForBinaryOperators, VAstPatternConverterForConditionalMacro, VAstPatternConverterForFunctionDeclaration, VAstPatternConverterForSuperCRoot, VAstPatternConverterForVariableDeclaration}
 
 class VAstConverterForC(private var vAstCreator: VAstCreatorNew) extends VAstConverter(vAstCreator) {
   private val conditionalConverter = new VAstPatternConverterForConditionalMacro(vAstCreator, this)
@@ -9,7 +9,8 @@ class VAstConverterForC(private var vAstCreator: VAstCreatorNew) extends VAstCon
     conditionalConverter,
     new VAstPatternConverterForFunctionDeclaration(vAstCreator, this),
     new VAstPatternConverterForSuperCRoot(vAstCreator, this),
-    new VAstPatternConverterForVariableDeclaration(vAstCreator, this)
+    new VAstPatternConverterForVariableDeclaration(vAstCreator, this),
+    new VASTPatternConverterForEmptyDefinition(vAstCreator, this)
   )
   super.addPatterns(patterns)
   super.addConditionalHandler(conditionalConverter)
