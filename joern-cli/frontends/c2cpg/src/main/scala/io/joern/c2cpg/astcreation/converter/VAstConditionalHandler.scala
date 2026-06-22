@@ -14,4 +14,12 @@ trait VAstConditionalHandler {
                         secondConditionSubtreeCreator: (Node) => Seq[Ast]): Seq[Ast]
   
   def isConditionalNode(node: Node): Boolean
+
+  def getFirstCondition(node: Node): String
+
+  def getSecondCondition(node: Node): Option[String]
+  
+  def getFirstConditionalSubtree(node: Node): Node
+  
+  def getSecondConditionalSubtree(node: Node): Option[Node]
 }
