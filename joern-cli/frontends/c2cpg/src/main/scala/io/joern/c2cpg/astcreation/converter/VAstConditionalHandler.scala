@@ -5,13 +5,9 @@ import xtc.tree.Node
 
 trait VAstConditionalHandler {
 
-  def createConditionalSuperCSubtree(conditionalNode: Node,
-                                     firstConditionSubtreeCreator: (Node) => Node,
-                                     secondConditionSubtreeCreator: (Node) => Node): Node
+  def createConditionalSuperCSubtree(conditionalNode: Node, conditionSubtreeCreator: (Node) => Node): Node
   
-  def handelConditional(conditionalNode: Node,
-                        firstConditionSubtreeCreator: (Node) => Seq[Ast],
-                        secondConditionSubtreeCreator: (Node) => Seq[Ast]): Seq[Ast]
+  def handelConditional(conditionalNode: Node, conditionSubtreeCreator: (Node) => Seq[Ast]): Seq[Ast]
   
   def isConditionalNode(node: Node): Boolean
 
@@ -22,4 +18,6 @@ trait VAstConditionalHandler {
   def getFirstConditionalSubtree(node: Node): Node
   
   def getSecondConditionalSubtree(node: Node): Option[Node]
+
+  def getAllConditionalAstSubtrees(node: Node): Seq[Node]
 }
