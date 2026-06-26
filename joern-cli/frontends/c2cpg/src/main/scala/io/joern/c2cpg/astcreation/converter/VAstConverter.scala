@@ -11,10 +11,12 @@ import scala.collection.mutable.ListBuffer
 class VAstConverter(private val vAstCreator: VAstCreatorNew) {
 
   private var conditionalHandler: Option[VAstConditionalHandler] = None
+  private var initialConverterState: VAstConverterState = VAstConverterState()
   private val patternConverters: mutable.Map[String, ListBuffer[VAstPatternConverter]] = mutable.Map.empty
 
   def addPattern(pattern: VAstPatternConverter): Unit = {
-    val (rootNodeTypes: List[String], converter: VAstPatternConverter) = pattern.registerPatternConverter()
+    val (rootNodeTypes: List[String], converter: VAstPatternConverter, state) = pattern.registerPatternConverter()
+    initialConverterState = initialConverterState.updateState(converter, state)
     for (rootNodeType: String <- rootNodeTypes) {
 
       val converterList: Option[ListBuffer[VAstPatternConverter]] = patternConverters.get(rootNodeType)
@@ -34,7 +36,7 @@ class VAstConverter(private val vAstCreator: VAstCreatorNew) {
     this.conditionalHandler = Option(conditionalHandler)
   }
 
-  def convert(superCVAstNode: Node): Seq[Ast] = {
+  def convert(superCVAstNode: Node, converterState: VAstConverterState): Seq[Ast] = {
     val nodeType: String = superCVAstNode.getName
     val converterList: Option[ListBuffer[VAstPatternConverter]] = patternConverters.get(nodeType)
     if (converterList == null || converterList.isEmpty) {
@@ -46,7 +48,7 @@ class VAstConverter(private val vAstCreator: VAstCreatorNew) {
       var continueCommand: Boolean = true
       val converterIndex: Int = 0
       while (continueCommand && converterIndex < converters.size) {
-        val joernVAst: Option[Seq[Ast]] = converters(converterIndex).convert(superCVAstNode)
+        val joernVAst: Option[Seq[Ast]] = converters(converterIndex).convert(superCVAstNode, converterState)
         if (joernVAst.isDefined) {
           asts = joernVAst.get
           continueCommand = false
@@ -71,4 +73,6 @@ class VAstConverter(private val vAstCreator: VAstCreatorNew) {
     require(conditionalHandler.isDefined, "No Conditional handler is defined.")
     conditionalHandler.get
   }
+
+  def getInitialConverterState: VAstConverterState = initialConverterState
 }

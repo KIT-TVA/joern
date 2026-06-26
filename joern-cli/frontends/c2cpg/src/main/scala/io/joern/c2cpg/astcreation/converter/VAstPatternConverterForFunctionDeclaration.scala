@@ -17,13 +17,13 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
   private val FUNCTION_NAME_ROOT_NODE_NAME: String = "FunctionDeclarator"
   private val FUNCTION_PARAMETER_ROOT_NODE_NAME: String = "PostfixingFunctionDeclarator"
   
-  override def convert(superCVAst: Node): Option[Seq[Ast]] = {
+  override def convert(superCVAst: Node, converterState: VAstConverterState): Option[Seq[Ast]] = {
 
     var methodInstructions: Seq[Ast] = Seq()
     val methodeRootNode: Node = superCVAst.getNode(1).getNode(1)
     val numberOfChildNodes: Int = methodeRootNode.size
     for (nodeIndex: Int <- 0 until numberOfChildNodes) {
-      methodInstructions = methodInstructions ++ converter.convert(methodeRootNode.getNode(nodeIndex))
+      methodInstructions = methodInstructions ++ converter.convert(methodeRootNode.getNode(nodeIndex), converterState)
     }
 
     println(s"METHOD-DELARATION-CODE-ELEMENTS: ${methodInstructions.size}")

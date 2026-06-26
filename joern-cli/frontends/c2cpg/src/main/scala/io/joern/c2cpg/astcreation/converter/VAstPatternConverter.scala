@@ -11,8 +11,10 @@ abstract class VAstPatternConverter(private val vAstCreator: VAstCreatorNew,
   
   protected val BLOCK_SPACING: String = "  "
   
-  def registerPatternConverter(): (List[String], VAstPatternConverter) = (rootNodeTypes, this)
+  def registerPatternConverter(): (List[String], VAstPatternConverter, Any) = (rootNodeTypes, this, getInitialState)
   
-  def convert(superCVAst: Node): Option[Seq[Ast]]
+  def convert(superCVAst: Node, converterState: VAstConverterState): Option[Seq[Ast]]
+  
+  protected def getInitialState: Any = null
 
 }

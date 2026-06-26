@@ -7,5 +7,5 @@ import xtc.tree.Node
 class VASTPatternConverterForEmptyDefinition(vAstCreator: VAstCreatorNew, converter: VAstConverter)
   extends VAstPatternConverter(vAstCreator, converter, List("EmptyDefinition")) {
 
-  override def convert(superCVAst: Node): Option[Seq[Ast]] = Option(Seq.empty[Ast])
+  override def convert(superCVAst: Node, converterState: VAstConverterState): Option[Seq[Ast]] = Option(Seq.empty[Ast])
 }

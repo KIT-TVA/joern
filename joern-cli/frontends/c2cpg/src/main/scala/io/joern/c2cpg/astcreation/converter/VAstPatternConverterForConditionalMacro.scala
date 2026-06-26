@@ -30,8 +30,8 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
   private val COLUMN_NUMBER_PROPERTY: String = "COLUMN_NUMBER"
   private val CODE_PROPERTY: String = "CODE"
   
-  override def convert(superCVAst: Node): Option[Seq[Ast]] = {
-    val handler: Node => Seq[Ast] = (node: Node) => converter.convert(node)
+  override def convert(superCVAst: Node, converterState: VAstConverterState): Option[Seq[Ast]] = {
+    val handler: Node => Seq[Ast] = (node: Node) => converter.convert(node, converterState)
     val asts: Seq[Ast] = handelConditional(superCVAst, handler)
     Option(asts)
   }
