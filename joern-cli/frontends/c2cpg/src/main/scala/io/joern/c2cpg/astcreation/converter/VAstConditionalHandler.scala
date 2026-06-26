@@ -8,6 +8,8 @@ trait VAstConditionalHandler {
   def createConditionalSuperCSubtree(conditionalNode: Node, conditionSubtreeCreator: (Node) => Node): Node
   
   def handelConditional(conditionalNode: Node, conditionSubtreeCreator: (Node) => Seq[Ast]): Seq[Ast]
+
+  def handelAndSimplifyConditional(conditionalNode: Node, conditionSubtreesCreator: Node => Seq[Ast]): Seq[Ast]
   
   def isConditionalNode(node: Node): Boolean
 
