@@ -1,6 +1,6 @@
 package io.joern.c2cpg.astcreation
 
-import io.joern.c2cpg.astcreation.converter.VAstConverter
+import io.joern.c2cpg.astcreation.converter.{VAstConverter, VAstConverterState}
 import io.joern.x2cpg.datastructures.VariableScopeManager
 import io.joern.x2cpg.{Ast, AstCreatorBase, AstNodeBuilder, Defines, ValidationMode}
 import io.shiftleft.codepropertygraph.generated.{Cpg, DiffGraphBuilder, PropertyDefaults}
@@ -25,7 +25,7 @@ class VAstCreatorNew(
     //val fileNode = NewFile().name(filename).order(0)
 
     val diffGraph: DiffGraphBuilder = Cpg.newDiffGraphBuilder
-    val astTree: Seq[Ast] =  converter.convert(superCAst)
+    val astTree: Seq[Ast] =  converter.convert(superCAst, converter.getInitialConverterState)
     //val ast = Ast(fileNode).withChild(astTree.head)
     val ast: Ast = astTree.head
     Ast.storeInDiffGraph(ast, diffGraph)
