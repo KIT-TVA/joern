@@ -31,7 +31,7 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
   private val CODE_PROPERTY: String = "CODE"
 
   override def getInitialState: Any = Seq.empty[String]
-  
+
   override def convert(superCVAst: Node, converterState: VAstConverterState): Option[Seq[Ast]] = {
     val handler: (Node, VAstConverterState) => Seq[Ast] =
       (node: Node, state: VAstConverterState) => converter.convert(node, state)
@@ -49,7 +49,7 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
   def createConditionalSuperCSubtree(conditionalNode: Node, converterState: VAstConverterState,
                                      conditionSubtreeCreator: (Node, VAstConverterState) => Node): Node = {
     require(isConditionalNode(conditionalNode),
-            s"It as a \"Conditional\" node expected, but a \"${conditionalNode.getName}\" node was passed")
+      s"It as a \"Conditional\" node expected, but a \"${conditionalNode.getName}\" node was passed")
 
     // Extents the passed conditionalSubtrreeCreator to also handel multiple consecutive conditional nodes.
     val conditionalHandler: (String, Node, VAstConverterState) => Node = (condition: String, node: Node, state: VAstConverterState) => {
@@ -66,7 +66,7 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
     val newSuperCSubtree: Node = GNode.create("Conditional", conditionalNode.size)
     newSuperCSubtree.add(FIRST_CONDITION_INFORMATION, conditionalNode.get(FIRST_CONDITION_INFORMATION))
     val firstConditionalSubtree: Node = conditionalHandler(getFirstCondition(conditionalNode),
-                                                           conditionalNode.getNode(FIRST_CONDITION_SUBTREE),
+      conditionalNode.getNode(FIRST_CONDITION_SUBTREE),
       converterState)
     newSuperCSubtree.add(FIRST_CONDITION_SUBTREE, firstConditionalSubtree)
 
@@ -74,9 +74,9 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
       // If it is an IF-ELSE conditional node.
       newSuperCSubtree.add(SECOND_CONDITION_INFORMATION, conditionalNode.get(SECOND_CONDITION_INFORMATION))
       val secondConditionalSubtree: Node = conditionalHandler(getSecondCondition(conditionalNode).get,
-                                                              conditionalNode.getNode(SECOND_CONDITION_SUBTREE),
-                                                               converterState)
-      newSuperCSubtree.add(SECOND_CONDITION_SUBTREE, firstConditionalSubtree)
+        conditionalNode.getNode(SECOND_CONDITION_SUBTREE),
+        converterState)
+      newSuperCSubtree.add(SECOND_CONDITION_SUBTREE, secondConditionalSubtree)
     }
 
     newSuperCSubtree
@@ -85,8 +85,8 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
   def handelConditional(conditionalNode: Node, converterState: VAstConverterState,
                         conditionSubtreeCreator: (Node,  VAstConverterState) => Seq[Ast]): Seq[Ast] = {
     require(isConditionalNode(conditionalNode),
-            s"It as a \"Conditional\" node expected, but a \"${conditionalNode.getName}\" node was passed")
-    
+      s"It as a \"Conditional\" node expected, but a \"${conditionalNode.getName}\" node was passed")
+
     // Extents the passed conditionalSubtrreeCreator to also multiple consecutive conditional nodes.
     val conditionalHandler: (String, Node, VAstConverterState) => Seq[Ast] = (condition: String, node: Node, state: VAstConverterState) => {
       val conditions: Seq[String] = state.getState(this).asInstanceOf[Seq[String]] ++ Seq(condition)
@@ -120,7 +120,7 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
       if (conditionalNode.size == FULL_CONDITIONAL_MACRO) {
         // If the conditional node contains two subtrees/conditions.
         secondConditionalSubAst = combineAsts(secondConditionalSubtree,
-                                              conditionalHandler(secondCondition, secondConditionalSubtree, converterState))
+          conditionalHandler(secondCondition, secondConditionalSubtree, converterState))
 
         // Verschiebt
         if (firstConditionalSubAst.root.isEmpty) {
@@ -136,7 +136,7 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
       if (isNecessaryCondition(firstCondition, firstConditionalSubAst, secondCondition, secondConditionalSubAst)) {
         // If the current conditional Node is a required conditional node.
         Seq(createConditionalNode(conditionalNode, firstCondition, firstConditionalSubAst,
-                                  secondCondition, secondConditionalSubAst))
+          secondCondition, secondConditionalSubAst))
 
       } else {
         // If the current conditional node only replicated conditions.
@@ -185,8 +185,8 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
         conditionSubtreesCreator(node, newConverterState).map(subAst => {
           val rootNode: Option[NewNode] = subAst.root
           if (rootNode.isDefined
-              && (rootNode.get.nodeKind == JOERN_CONTROL_STRUCTURE_NODE_KIND)
-              && !rootNode.get.asInstanceOf[NewControlStructure].presenceCondition.equals("<empty>")) {
+            && (rootNode.get.nodeKind == JOERN_CONTROL_STRUCTURE_NODE_KIND)
+            && !rootNode.get.asInstanceOf[NewControlStructure].presenceCondition.equals("<empty>")) {
             // if the root node of the sub AST is a conditional/chiose node.
 
             // Updates/extends the presence conditions of the conditional/choise node.
@@ -279,7 +279,7 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
   }
 
   private def isNecessaryCondition(firstCondition: String, firstConditionalSubAst: Ast,
-                           secondCondition: String, secondConditionalSubAst: Ast): Boolean = {
+                                   secondCondition: String, secondConditionalSubAst: Ast): Boolean = {
     // Checks if the conditional node is required to describe the conditional code.
     var isNecessaryConditionalNode: Boolean = true
     if (firstConditionalSubAst.root.isEmpty && secondConditionalSubAst.root.isEmpty) {
@@ -287,7 +287,7 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
       isNecessaryConditionalNode = false
 
     } else if (firstCondition.equals(NO_CONDITION)
-                && ((secondCondition == null) || secondCondition.equals("") || secondCondition.equals(NO_CONDITION))) {
+      && ((secondCondition == null) || secondCondition.equals("") || secondCondition.equals(NO_CONDITION))) {
       // If the defined conditions are always satisfied.
       isNecessaryConditionalNode = false
 
@@ -324,11 +324,11 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
                                     secondCondition: String = "", secondConditionSubtree: Ast = vAstCreator.AstHelper()): Ast = {
     /// Cheks the requierments.
     require((firstCondition != null) && (firstConditionSubtree != null) && firstConditionSubtree.root.isDefined,
-            "A conditional Node can only be created if at least the firest subtree and condition is defined")
-    
+      "A conditional Node can only be created if at least the firest subtree and condition is defined")
+
     require((secondCondition.equals("") && ((secondConditionSubtree == null) || secondConditionSubtree.root.isEmpty))
-            || ((!secondCondition.equals("")) && (secondConditionSubtree != null) && secondConditionSubtree.root.isDefined),
-            "If a conditional node with two conditions is desired, both the second condition and a second AST hast to be passed.")
+      || ((!secondCondition.equals("")) && (secondConditionSubtree != null) && secondConditionSubtree.root.isDefined),
+      "If a conditional node with two conditions is desired, both the second condition and a second AST hast to be passed.")
 
     val firstCodePart: String = firstConditionSubtree.root.get.asInstanceOf[AstNodeNew].code
     val code: String = if ((secondConditionSubtree == null) || secondConditionSubtree.root.isEmpty) {
@@ -390,7 +390,7 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
       None
     }
   }
-  
+
   def getFirstConditionalSubtree(node: Node): Node = {
     require(isConditionalNode(node), "A conditional node was expected, but a node of a different node type was passed.")
     node.getNode(FIRST_CONDITION_SUBTREE)
@@ -404,7 +404,7 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
       None
     }
   }
-  
+
   def getAllConditionalAstSubtrees(node: Node): Seq[Node] = {
     if (isConditionalNode(node)) {
       if (node.size == SIMPLE_CONDITIONAL_MACRO) {

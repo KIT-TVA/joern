@@ -4,17 +4,17 @@ import io.joern.c2cpg.astcreation.converter.{VAstConverter, VAstConverterState}
 import io.joern.x2cpg.datastructures.VariableScopeManager
 import io.joern.x2cpg.{Ast, AstCreatorBase, AstNodeBuilder, Defines, ValidationMode}
 import io.shiftleft.codepropertygraph.generated.{Cpg, DiffGraphBuilder, PropertyDefaults}
-import io.shiftleft.codepropertygraph.generated.nodes.{NewBlock, NewCall, NewControlStructure, NewFile, NewLocal, NewMethod, NewMethodReturn, NewModifier, NewNode, NewReturn}
+import io.shiftleft.codepropertygraph.generated.nodes.{NewBlock, NewCall, NewControlStructure, NewFile, NewLocal, NewMethod, NewMethodReturn, NewModifier, NewNode, NewReturn, NewTypeRef}
 import org.slf4j.{Logger, LoggerFactory}
 import xtc.tree.Node
 
 class VAstCreatorNew(
-                     val filename: String,
-                     val global: CGlobal,
-                     //val config: Config,
-                     val superCAst: Node,
-                     //val headerFileFinder: HeaderFileFinder
-                   ) extends AstCreatorBase[Node, VAstCreatorNew](filename)(ValidationMode.Disabled) {
+                      val filename: String,
+                      val global: CGlobal,
+                      //val config: Config,
+                      val superCAst: Node,
+                      //val headerFileFinder: HeaderFileFinder
+                    ) extends AstCreatorBase[Node, VAstCreatorNew](filename)(ValidationMode.Disabled) {
 
   protected implicit val schemaValidation: ValidationMode = ValidationMode.Disabled
   protected val scope: VariableScopeManager = new CVariableScopeManager()
@@ -77,7 +77,7 @@ class VAstCreatorNew(
                      ): NewLocal = {
     localNodeCreator(node, name, code, typeFullName, closureBindingId, genericSignature, line, column)
   }
-  
+
   def controlStructureHelper(node: Node,
                              controlStructureType: String,
                              code: String,
@@ -123,36 +123,39 @@ class VAstCreatorNew(
   }
 
   def methodReturnNodeHelper(node: Node,
-                                       typeFullName: String,
-                                       dynamicTypeHintFullName: Option[String] = None,
-                                       line: Option[Int] = None,
-                                       column: Option[Int] = None
-                                       ): NewMethodReturn = {
+                             typeFullName: String,
+                             dynamicTypeHintFullName: Option[String] = None,
+                             line: Option[Int] = None,
+                             column: Option[Int] = None
+                            ): NewMethodReturn = {
     methodReturnNodeCreator(node, typeFullName, dynamicTypeHintFullName, line, column)
   }
 
 
   def returnNodeHelper(node: Node, code: String,
-                                  line: Option[Int] = None, column: Option[Int] = None): NewReturn = {
+                       line: Option[Int] = None, column: Option[Int] = None): NewReturn = {
     returnNodeCreator(node, code, line, column)
   }
 
   def callNodeHelper(
-    node: Node,
-    code: String,
-    name: String,
-    methodFullName: String,
-    dispatchType: String,
-    signature: Option[String],
-    typeFullName: Option[String],
-    line: Option[Int] = None,
-    column: Option[Int] = None
-  ): NewCall = {
+                      node: Node,
+                      code: String,
+                      name: String,
+                      methodFullName: String,
+                      dispatchType: String,
+                      signature: Option[String],
+                      typeFullName: Option[String],
+                      line: Option[Int] = None,
+                      column: Option[Int] = None
+                    ): NewCall = {
     callNodeCreator(node, code, name, methodFullName, dispatchType, signature, typeFullName, line, column)
   }
-  
+
   def controlStructureNodeHelper(node: Node, controlStructureType: String, code: String,
-                                  line: Option[Int] = None, column: Option[Int] = None): NewControlStructure = {
+                                 line: Option[Int] = None, column: Option[Int] = None): NewControlStructure = {
     controlStructureNodeCreator(node, controlStructureType, code, line, column)
   }
+
+  def typeRefNodeHelper(node: Node, code: String, typeFullName: String): NewTypeRef =
+    typeRefNode(node, code, typeFullName)
 }
