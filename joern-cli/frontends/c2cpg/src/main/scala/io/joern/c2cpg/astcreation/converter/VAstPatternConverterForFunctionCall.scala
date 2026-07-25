@@ -17,6 +17,7 @@ class VAstPatternConverterForFunctionCall(vAstCreator: VAstCreatorNew, converter
   ) {
 
   override def convert(superCVAst: Node, converterState: VAstConverterState): Option[Seq[Ast]] = {
+    // converter.getConditionalHandler.handelAndSimplifyConditional(...)
     functionCallNode(superCVAst) match {
       case None =>
         if (superCVAst.getName == "ExpressionStatement" && superCVAst.size() > 0) {

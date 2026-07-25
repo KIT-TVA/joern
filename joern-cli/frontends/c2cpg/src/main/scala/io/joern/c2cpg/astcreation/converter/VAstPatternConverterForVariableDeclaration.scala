@@ -96,7 +96,7 @@ class VAstPatternConverterForVariableDeclaration(vAstCreator: VAstCreatorNew, co
 
     val code: String = s"$variableType $variableName"
     val declaration: NewLocal = vAstCreator.localNodeHelper(variableNameNode, variableName, code, variableType,
-                                                            line=line, column=column)
+      line=line, column=column)
     val declarationAst: Ast = vAstCreator.AstHelper(declaration)
 
     if (initialisationNode.size == 0) {
@@ -109,10 +109,19 @@ class VAstPatternConverterForVariableDeclaration(vAstCreator: VAstCreatorNew, co
       // initialization and assignment.
       val targetVariableNode: Node = GNode.create(TARGET_VARIABLE_NODE_NAME, variableNameNode.getNode(0))
       val assignmentOperatorNode: Node = GNode.create(ASSIGNMENT_OPERATOR_NODE_NAME)
+      val rhsNode = initializerExpression(initialisationNode)
       val assignmentNode: Node = GNode.create(ASSIGNMENT_EXPRESSION_NODE_NAME, targetVariableNode,
-                                              assignmentOperatorNode, initialisationNode.getNode(0))
+        assignmentOperatorNode, rhsNode)
 
       Seq(declarationAst) ++ converter.convert(assignmentNode, converterState)
     }
   }
+
+  /** SuperC: initializer is either the expression itself (e.g. s.x, a * b) or wrapped in Initializer. */
+  private def initializerExpression(initialisationNode: Node): Node =
+    if (initialisationNode.getName == "Initializer" && initialisationNode.size() > 0) {
+      initialisationNode.getNode(0)
+    } else {
+      initialisationNode
+    }
 }
