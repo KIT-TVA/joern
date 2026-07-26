@@ -21,6 +21,7 @@ import xtc.tree.{GNode, Location, Node}
 import superc.core.{PresenceConditionManager, Syntax}
 import superc.core.PresenceConditionManager.PresenceCondition
 
+import scala.collection.mutable.Set
 import scala.jdk.CollectionConverters.*
 import java.io.{File, StringReader}
 
@@ -29,6 +30,7 @@ object TestUtil {
 
   private val JOERN_METHOD_NODE_KIND_ID: Int = 25
   private val GLOBAL_DOT_GRAPH_IDENTIFIER: String = "&lt;global&gt;"
+  private val definedDotGraphNodeIDs: Set[Int] = Set.empty[Int]
 
   def generateVASTDot(cCode: String): (String, String) = 
     generateVASTDot(cCode, None, false)
@@ -87,7 +89,10 @@ object TestUtil {
     val superCParseResult: Node = sup.parse(stringReader, dummyFile)
 
     // Converts the SuperC VAST data structure into a dot graph.
-    val superCDotGraph: String = superCGraphToDotGraph(superCParseResult)
+    var superCDotGraph: String = superCGraphToDotGraph(superCParseResult, true)
+    println(superCDotGraph)
+    println("\n\n\n\n\n")
+    superCDotGraph = superCGraphToDotGraph(superCParseResult, false)
     println(superCDotGraph)
 
     // General preparations for JOERN.
@@ -121,12 +126,15 @@ object TestUtil {
    * @param superCpg The SuperC CPG data structure.
    * @return Returns the SuperC CPG as dot graph.
    */
-  def superCGraphToDotGraph(superCpg: Node): String = {
-    val (graph, _) = superCGraphToDotGraphHelper(superCpg, 0)
-    s"digraph SupcerC_AST {\n  graph [rankdir=TB];\n  node [shape=box];\n  edge [color=gray];\n\n${graph}}"
+  def superCGraphToDotGraph(superCpg: Node, showObjectGraph: Boolean = false): String = {
+    definedDotGraphNodeIDs.clear()
+    val rootDotGraphNodeID: Int = if (showObjectGraph) System.identityHashCode(superCpg) else 0
+    val (graph: String, _) = superCGraphToDotGraphHelper(superCpg, rootDotGraphNodeID, showObjectGraph)
+    definedDotGraphNodeIDs.clear()
+    s"digraph SupcerC_AST {\n  graph [rankdir=TB];\n  node [shape=box];\n  edge [color=gray];\n\n$graph}"
   }
 
-  def processSuperCNode(node: Node, dotGraphNodeID: Int): (String, Int) = {
+  def processSuperCNode(node: Node, dotGraphNodeID: Int, showObjectGraph: Boolean): (String, Int) = {
     val location: Location = node.getLocation
     var propertyString: String = "<br/><i>file undefined</i>"
     if (location != null) {
@@ -136,7 +144,7 @@ object TestUtil {
     val propertyNames = node.properties
     propertyString = propertyString + s"<br/>properties (number: ${propertyNames.size})"
     for (propertyName: String <- propertyNames.asScala) {
-      propertyString = propertyString + s"<br/> - \"${propertyName}: &lt;value is not shown&gt;"
+      propertyString = propertyString + s"<br/> - \"$propertyName: &lt;value is not shown&gt;"
       // propertyString = propertyString + s"<br/> - \"${propertyName}: \"<i>${node.getStringProperty(propertyName)}</i>\""
     }
 
@@ -158,18 +166,23 @@ object TestUtil {
       case _ => ""
     }
 
-    val nodeDefinition: String = s"  \"${dotGraphNodeID.toString}\" [label=<${node.getClass.toString}<br/>" +
-      s"<b>${node.getName}</b>${propertyString}>${style}]\n"
+    definedDotGraphNodeIDs.add(dotGraphNodeID)
+    val objectAddress: String = java.lang.Integer.toHexString(System.identityHashCode(node))
+    val nodeDefinition: String = s"  \"${dotGraphNodeID.toString}\" [label=<<i>0x$objectAddress</i><br/>" +
+      s"${node.getClass.toString}<br/><b>${node.getName}</b>$propertyString>$style]\n"
     var subGraphs: String = ""
     var edges: String = ""
     var newDotGraphNodeID: Int = dotGraphNodeID
     for (index: Int <- 0 until node.size) {
-      newDotGraphNodeID = newDotGraphNodeID + 1
+      newDotGraphNodeID = if (showObjectGraph) System.identityHashCode(node.get(index)) else newDotGraphNodeID + 1
 
-      val edge: String = s"  \"${dotGraphNodeID}\" -> \"${newDotGraphNodeID}\" [label=\"[${index}]\"];\n"
-      val (subGraph: String, nextDotGraphNodeID: Int) = superCGraphToDotGraphHelper(node.get(index), newDotGraphNodeID)
+      val edge: String = s"  \"$dotGraphNodeID\" -> \"$newDotGraphNodeID\" [label=\"[$index]\"];\n"
+      val (subGraph: String, nextDotGraphNodeID: Int) =
+        superCGraphToDotGraphHelper(node.get(index), newDotGraphNodeID, showObjectGraph)
       newDotGraphNodeID = nextDotGraphNodeID
-      if (subGraph != "") {
+      if (subGraph.equals("<<DUPLICATE>>")) {
+        edges = edges + edge
+      } else if (!subGraph.equals("")) {
         subGraphs = subGraphs + subGraph
         edges = edges + edge
       }
@@ -177,50 +190,60 @@ object TestUtil {
     (nodeDefinition + subGraphs + edges, newDotGraphNodeID)
   }
 
-  def processSuperCPresenceCondition(node: PresenceCondition, dotGraphNodeID: Int): (String, Int) = {
+  def processSuperCPresenceCondition(node: PresenceCondition, dotGraphNodeID: Int,
+                                     showObjectGraph: Boolean): (String, Int) = {
 
     val condition: String = node.toString.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    val conditionalExpression: String = s"Condition:<br/>\"<i>${condition}</i>\""
+    val conditionalExpression: String = s"Condition:<br/>\"<i>$condition</i>\""
     
     var allConfigString: String = "Configurations:"
     val allConfigs = node.getAllConfigs.asScala
     for (config: String <- allConfigs) {
       val escaped_config: String = config.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-      allConfigString = allConfigString + s"<br/> - \"<i>${escaped_config}</i>\""
+      allConfigString = allConfigString + s"<br/> - \"<i>$escaped_config</i>\""
     }
 
+    definedDotGraphNodeIDs.add(dotGraphNodeID)
     val bdd = node.getBDD
     val bddToString: String = bdd.toString.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     val bddToStringWithDomains: String = bdd.toStringWithDomains.replace("<", "&lt;").replace(">", "&gt;")
     val className: String = node.getClass.toString.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    val conditionalNode: String = s"  \"${dotGraphNodeID}\" [label=<${className}<br/>${conditionalExpression}<br/>" +
-      s"${allConfigString}<br/><br/>BDD.toString: \"<i>${bddToString}</i>\"<br/>BDD.toStringWithDomains: \"<i>" +
-      s"${bddToStringWithDomains}</i>\"<br/><i>maybe an incomplete subtree</i>> color=\"#a22223\" style=filled " +
-      "fillcolor=\"#f2d5cb\"];\n"
+    val objectAddress: String = java.lang.Integer.toHexString(System.identityHashCode(node))
+    val conditionalNode: String = s"  \"$dotGraphNodeID\" [label=<<i>0x$objectAddress</i><br/>$className<br/>" +
+      s"$conditionalExpression<br/>$allConfigString<br/><br/>BDD.toString: \"<i>$bddToString</i>\"<br/>" +
+      s"BDD.toStringWithDomains: \"<i>$bddToStringWithDomains</i>\"<br/><i>maybe an incomplete subtree</i>> " +
+      "color=\"#a22223\" style=filled fillcolor=\"#f2d5cb\"];\n"
 
     val subtreeNode = node.tree()
     if (subtreeNode == null) return (conditionalNode, dotGraphNodeID)
 
-    val edge = "  \"" + dotGraphNodeID + "\" -> \"" + (dotGraphNodeID + 1) + "\"\n"
-    val (subtree: String, newDotGraphNodeID: Int) = superCGraphToDotGraphHelper(node.tree(), dotGraphNodeID + 1)
+    val nextDotGraphNodeID: Int = if (showObjectGraph) System.identityHashCode(node.tree()) else dotGraphNodeID + 1
+    val edge = s"  \"$dotGraphNodeID\" -> \"$nextDotGraphNodeID\"\n"
+    val (subtree: String, newDotGraphNodeID: Int) =
+      superCGraphToDotGraphHelper(node.tree(), nextDotGraphNodeID, showObjectGraph)
     (conditionalNode + subtree + edge, newDotGraphNodeID)
   }
 
-  def superCGraphToDotGraphHelper(nodeD: Any, dotGraphNodeID: Int): (String, Int) = {
+  def superCGraphToDotGraphHelper(nodeD: Any, dotGraphNodeID: Int, showObjectGraph: Boolean): (String, Int) = {
     require(nodeD != null, "It seems that the C code parsed by SuperC contains a syntax error.")
     nodeD match {
-      case node: GNode  => processSuperCNode(node, dotGraphNodeID)
-      case node: Syntax => processSuperCNode(node, dotGraphNodeID)
-      case node: PresenceCondition => processSuperCPresenceCondition(node, dotGraphNodeID)
+      case node if definedDotGraphNodeIDs.contains(dotGraphNodeID) => ("<<DUPLICATE>>", dotGraphNodeID)
+      case node: GNode  => processSuperCNode(node, dotGraphNodeID, showObjectGraph)
+      case node: Syntax => processSuperCNode(node, dotGraphNodeID, showObjectGraph)
+      case node: PresenceCondition => processSuperCPresenceCondition(node, dotGraphNodeID, showObjectGraph)
 
       case node if node.getClass.toString == "class java.lang.String" =>
+        definedDotGraphNodeIDs.add(dotGraphNodeID)
         val className: String = node.toString.replace("<", "&lt;").replace(">", "&gt;")
-        (s"  \"${dotGraphNodeID}\" [label=<${node.getClass.toString}<br/>content: \"<i>${className}</i>\"> " +
-          "color=\"#fce500\" style=filled fillcolor=\"#fefbd8\"];\n", dotGraphNodeID)
+        val objectAddress: String = java.lang.Integer.toHexString(System.identityHashCode(node))
+        (s"  \"$dotGraphNodeID\" [label=<<i>0x$objectAddress</i><br/>${node.getClass.toString}<br/>content: \"<i>" +
+          s"$className</i>\"> color=\"#fce500\" style=filled fillcolor=\"#fefbd8\"];\n", dotGraphNodeID)
       case node =>
+        definedDotGraphNodeIDs.add(dotGraphNodeID)
         val className: String = node.toString.replace("<", "&lt;").replace(">", "&gt;")
-        (s"  \"${dotGraphNodeID}\" [label=<${className}<br/><i>maybe an incomplete subtree</i>> color=\"#a22223\" " +
-          "style=filled fillcolor=\"#f2d5cb\"];\n", dotGraphNodeID)
+        val objectAddress: String = java.lang.Integer.toHexString(System.identityHashCode(node))
+        (s"  \"$dotGraphNodeID\" [label=<<i>0x$objectAddress</i><br/>$className<br/><i>maybe an incomplete " +
+          "subtree</i>> color=\"#a22223\" style=filled fillcolor=\"#f2d5cb\"];\n", dotGraphNodeID)
     }
   }
 }
