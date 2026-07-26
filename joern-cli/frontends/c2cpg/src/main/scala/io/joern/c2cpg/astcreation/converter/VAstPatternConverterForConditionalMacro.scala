@@ -50,7 +50,7 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
 
   /**
    * Creates a new SuperC sub VAST with the passed Conditional node as root Node.
-   * 
+   *
    * @param conditionalNode         The conditional root node that need to be transformed.
    * @param converterState          The  converter state that should be used for the transformation.
    * @param conditionSubtreeCreator The creator method that should be used for the transformation of th conditional
@@ -498,7 +498,7 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
       }
 
       println(s"first condition: \"$firstCondition\" des.: $preliminaryRequirementDecision")
-      
+
       if (!preliminaryRequirementDecision) {
         if ((secondConditionalSubAst == null) || secondConditionalSubAst.root.isEmpty) {
           isNecessaryConditionalNode = false
@@ -704,7 +704,7 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
     if (dfTerms.size <= 1) {
       // No simplification is possible
       dfTerms
-      
+
     } else {
       // Simplify the expression with the Quine McCluskey algorithm.
 
@@ -712,7 +712,7 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
       val variableNames: List[String] = dfTerms.flatMap((terms: Seq[String]) => terms.map((variable: String) => removeNegation(variable))).toList.distinct
       val variableNameMap: Map[String, Int] = variableNames.zipWithIndex.toMap
       val numberOfVariableNames: Int = variableNames.size
-  
+
       // Converts the DF termes to logic strings made of '0', '1' and '-' (0 and 1 at the same time)
       val allTrue: String = "-" * numberOfVariableNames
       val logicStrings: List[String] = dfTerms.map((term: Seq[String]) => {
