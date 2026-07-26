@@ -21,7 +21,7 @@ class testConditionalMacro extends C2CpgSuite(withOssDataflow = true) {
     | #endif
     | #endif
     |
-    | #ifdef MACRO4 && MACRO5
+    | #if MACRO4 && MACRO5
     | int e;
     | #endif
     | int f;
