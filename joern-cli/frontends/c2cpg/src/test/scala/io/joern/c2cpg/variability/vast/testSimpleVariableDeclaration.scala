@@ -26,6 +26,11 @@ class testSimpleVariableDeclaration extends C2CpgSuite(withOssDataflow = true) {
       | int a;
       | char c;
       | long l;
+      |
+      | void main() {
+      |  a = 3;
+      |  l = 2 + 3;
+      | }
       |""".stripMargin
   val cCpg: TestCpg = code(cCode, cFilename)
   val cTraversal: Iterator[Method] = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
