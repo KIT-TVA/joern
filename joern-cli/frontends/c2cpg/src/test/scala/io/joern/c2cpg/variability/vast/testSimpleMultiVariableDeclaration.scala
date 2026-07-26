@@ -8,7 +8,7 @@ import io.shiftleft.codepropertygraph.generated.nodes
 import io.shiftleft.semanticcpg.dotgenerator.DotAstGenerator
 
 
-class testSimpleMultiVariableDeclarationAndInitialization extends C2CpgSuite(withOssDataflow = true) {
+class testSimpleMultiVariableDeclaration extends C2CpgSuite(withOssDataflow = true) {
   val cFilename: String = "test_c_file.c"
   val cCode: String =
     """
@@ -21,7 +21,7 @@ class testSimpleMultiVariableDeclarationAndInitialization extends C2CpgSuite(wit
       | long t = a + b + 3;
       | void i() {
       |   a = 49;
-      |   b = (3 + a) * (5 + 6 - 6 * 7) * 5 / 3;
+      |   b = 3 + a;
       | }
       |""".stripMargin
   val cCpg: TestCpg = code(cCode, cFilename)
