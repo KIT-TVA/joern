@@ -2,6 +2,10 @@ package io.joern.c2cpg.variability.vast
 
 import io.joern.c2cpg.testfixtures.C2CpgSuite
 import io.joern.c2cpg.variability.util.TestUtil.generateVASTDot
+import io.joern.x2cpg.testfixtures.TestCpg
+import io.shiftleft.codepropertygraph.generated.nodes
+import io.shiftleft.codepropertygraph.generated.nodes.Method
+import io.shiftleft.semanticcpg.dotgenerator.DotAstGenerator
 
 class testWhile extends C2CpgSuite(withOssDataflow = true) {
 
@@ -21,13 +25,20 @@ class testWhile extends C2CpgSuite(withOssDataflow = true) {
       |  } while (x > 0);
       |
       |  while (
-      |#ifdef USE_X
-      |x
+      |#ifdef USE_XSSSSS
+      |x < 1
       |#else
-      |y
+      |y > 0
       |#endif
-      |  > 0) {
+      |  ) {
+      |    #if USE_A
       |    helper(x);
+      |#if USE_B
+      |    x--;
+      |#else
+      |    x++;
+      |#endif
+      |#endif
       |  }
       |
       |  do {
@@ -39,9 +50,21 @@ class testWhile extends C2CpgSuite(withOssDataflow = true) {
       |    x++;
       |#endif
       |#endif
-      |  } while (x > 0);
+      |  } while (
+      |  #ifdef USE_XSSSSS
+      |x < 1
+      |#else
+      |y > 0
+      |#endif
+      |  );
       |}
       |""".stripMargin
+
+  val cCpg: TestCpg = code(cCode, "test_while.c")
+  val cTraversal: Iterator[Method] = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
+  val cAstDotString: Iterator[String] = DotAstGenerator.dotAst(cTraversal, extended_view = true)
+  println("Standard Joern C AST:")
+  println(cAstDotString.mkString)
 
   val (superCAstDotString, superCJoernAstDotString) = generateVASTDot(cCode, "test_while.c")
 
