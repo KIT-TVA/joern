@@ -46,12 +46,14 @@ class VAstConverter(private val vAstCreator: VAstCreatorNew) {
 
       var asts: Seq[Ast] = Seq.empty
       var continueCommand: Boolean = true
-      val converterIndex: Int = 0
+      var converterIndex: Int = 0
       while (continueCommand && converterIndex < converters.size) {
         val joernVAst: Option[Seq[Ast]] = converters(converterIndex).convert(superCVAstNode, converterState)
         if (joernVAst.isDefined) {
           asts = joernVAst.get
           continueCommand = false
+        } else {
+          converterIndex += 1
         }
       }
 
