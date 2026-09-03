@@ -6,6 +6,7 @@ import io.joern.c2cpg.astcreation.VAstCreatorNew
 import io.joern.x2cpg.{Ast, AstEdge}
 import io.shiftleft.codepropertygraph.generated.{ControlStructureTypes, nodes}
 import io.shiftleft.codepropertygraph.generated.nodes.{AstNodeNew, NewBlock, NewControlStructure, NewNode}
+import javassist.CtNewConstructor
 import superc.core.PresenceConditionManager.PresenceCondition
 import xtc.tree.{GNode, Node}
 
@@ -26,7 +27,8 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
 
   private val NO_CONDITION: String = "1"
   private val JOERN_CONTROL_STRUCTURE_NODE_KIND: Short = 11
-  private val JOERN_BLOCK_NODE_KIND = 6
+  private val JOERN_BLOCK_NODE_KIND: Short = 6
+  private val JOERN_CONTROL_STRUCTURE_NODE_LABEL: String = "CONTROL_STRUCTURE"
 
   private val LINE_NUMBER_PROPERTY: String = "LINE_NUMBER"
   private val COLUMN_NUMBER_PROPERTY: String = "COLUMN_NUMBER"
@@ -88,7 +90,7 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
       val secondConditionalSubtree: Node = conditionalHandler(getSecondCondition(conditionalNode).get,
                                                               conditionalNode.getNode(SECOND_CONDITION_SUBTREE),
                                                               converterState)
-      newSuperCSubtree.add(SECOND_CONDITION_SUBTREE, firstConditionalSubtree)
+      newSuperCSubtree.add(SECOND_CONDITION_SUBTREE, secondConditionalSubtree)
     }
 
     newSuperCSubtree
@@ -237,7 +239,7 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
     }
 
     // Extracts conditions and subtrees.
-    val (firstCondition: String, firstConditionalSubtree: Node, secondCondition: String, secondConditionalSubtree: Node) =
+    val (firstCondition: String, firstConditionalSubtree: Node, secondCondition, secondConditionalSubtree) =
       extractConditionsAndSubtrees(conditionalNode)
 
     // Converts the SuperC subtrees.
@@ -285,6 +287,12 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
     })
     sortAstsByCodPosition(subAsts)
   }
+
+  def handleAndSimplifyConditionalExtended(conditionalNode: Node, converterState: VAstConverterState,
+                                           conditionSubtreesCreator: (Node, VAstConverterState) => Seq[Ast]): Seq[Ast] =
+    if (isConditionalNode(conditionalNode)) {
+      handelAndSimplifyConditional(conditionalNode, converterState, conditionSubtreesCreator)
+    } else conditionSubtreesCreator(conditionalNode, converterState)
 
   /**
    * Sorts the AST sequence by the first code position of each AST.
@@ -602,6 +610,10 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
 
   def isConditionalNode(node: Node): Boolean = node.isInstanceOf[GNode] &&node.getName.equals("Conditional")
 
+  def isChoiceNode(node: NewNode): Boolean = (node.nodeKind == JOERN_CONTROL_STRUCTURE_NODE_KIND)
+    && node.label.equals(JOERN_CONTROL_STRUCTURE_NODE_LABEL)
+    && node.asInstanceOf[NewControlStructure].controlStructureType.equals(ControlStructureTypes.CHOICE)
+
   def getFirstCondition(node: Node): String = {
     require(isConditionalNode(node), "A conditional node was expected, but a node of a different node type was passed.")
     node.get(FIRST_CONDITION_INFORMATION).asInstanceOf[PresenceCondition].toString
@@ -615,6 +627,12 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
       None
     }
   }
+
+
+  def getFirstPresenceConditions(choiceNode: NewControlStructure): String = getPresenceConditions(choiceNode)("AST1")
+
+  def getSecondPresenceConditions(choiceNode: NewControlStructure): Option[String] =
+    getPresenceConditions(choiceNode).get("AST2")
 
   def getFirstConditionalSubtree(node: Node): Node = {
     require(isConditionalNode(node), "A conditional node was expected, but a node of a different node type was passed.")
@@ -883,6 +901,13 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
     }
   }
 
+  /**
+   * Compares the to given JOERN ASTs node-wise with all node parameters and child nodes.
+   *
+   * @param ast1 First AST to compare.
+   * @param ast2 Second AST to compare.
+   * @return Returns `true` if the two given JOERN ASTs are the same otherwise `false` is returned.
+   */
   private def sameAst(ast1: Ast, ast2: Ast): Boolean = {
     val conditionalNode1: NewNode = ast1.root.get
     val conditionalNode2: NewNode = ast2.root.get

@@ -1,6 +1,7 @@
 package io.joern.c2cpg.astcreation.converter
 
 import io.joern.x2cpg.Ast
+import io.shiftleft.codepropertygraph.generated.nodes.{NewControlStructure, NewNode}
 import xtc.tree.Node
 
 trait VAstConditionalHandler {
@@ -14,11 +15,20 @@ trait VAstConditionalHandler {
   def handelAndSimplifyConditional(conditionalNode: Node, converterState: VAstConverterState,
                                    conditionSubtreesCreator: (Node, VAstConverterState) => Seq[Ast]): Seq[Ast]
   
+  def handleAndSimplifyConditionalExtended(conditionalNode: Node, converterState: VAstConverterState,
+                                           conditionSubtreesCreator: (Node, VAstConverterState) => Seq[Ast]): Seq[Ast]
+  
   def isConditionalNode(node: Node): Boolean
+  
+  def isChoiceNode(node: NewNode): Boolean
 
   def getFirstCondition(node: Node): String
 
   def getSecondCondition(node: Node): Option[String]
+  
+  def getFirstPresenceConditions(choiceNode: NewControlStructure): String
+
+  def getSecondPresenceConditions(choiceNode: NewControlStructure): Option[String]
   
   def getFirstConditionalSubtree(node: Node): Node
   
