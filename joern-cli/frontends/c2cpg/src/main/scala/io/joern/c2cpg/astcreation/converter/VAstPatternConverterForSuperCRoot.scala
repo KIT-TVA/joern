@@ -2,14 +2,17 @@ package io.joern.c2cpg.astcreation.converter
 
 import io.joern.c2cpg.astcreation.VAstCreatorNew
 import io.joern.c2cpg.astcreation.converter.VAstConverter
-import io.joern.x2cpg.Ast
-import io.shiftleft.codepropertygraph.generated.nodes.{Method, NewBlock, NewMethod, NewMethodReturn, NewNode}
+import io.joern.x2cpg.{Ast, AstEdge}
+import io.shiftleft.codepropertygraph.generated.ControlStructureTypes
+import io.shiftleft.codepropertygraph.generated.nodes.{Method, NewBlock, NewControlStructure, NewMethod, NewMethodReturn, NewNode}
 import xtc.tree.Node
 
 import scala.collection.mutable.ListBuffer
 
 class VAstPatternConverterForSuperCRoot(vAstCreator: VAstCreatorNew, converter: VAstConverter)
   extends VAstPatternConverter(vAstCreator, converter, List.apply("TranslationUnit")) {
+
+  private val JOERN_CONTROL_STRUCTURE_NODE_KIND: Short = 11
 
   private val globaleFileMethodeName: String = "<global>"
   private val globaleFileMethodeReturnType: String = "ANY"
@@ -41,8 +44,9 @@ class VAstPatternConverterForSuperCRoot(vAstCreator: VAstCreatorNew, converter: 
         if (astSubtreeRootNode.isEmpty) throw new RuntimeException("The returned AST does not contain a root node.")
 
         // Splits the subtrees into functions and other global declarations.
-        astSubtreeRootNode.get.getClass.toString match {
-          case "class io.shiftleft.codepropertygraph.generated.nodes.NewMethod" => definedFunctions += astSubtree
+        astSubtreeRootNode.get match {
+          case methodeNodee: NewMethod => definedFunctions += astSubtree
+          case conditionalMethodeNode if (isConditionalMethod(conditionalMethodeNode, astSubtree)) => definedFunctions += astSubtree
           case _ => globalCodeBlockStatements += astSubtree
         }
       }
@@ -74,5 +78,16 @@ class VAstPatternConverterForSuperCRoot(vAstCreator: VAstCreatorNew, converter: 
       modifiers = List()
     )
     Option(Seq(method))
+  }
+
+  private def isConditionalMethod(rootNode: NewNode, ast: Ast): Boolean = {
+    if (!converter.getConditionalHandler.isChoiceNode(rootNode)) {
+      false
+    } else {
+      val childNodes: Seq[NewNode] = ast.edges
+        .filter((edge: AstEdge) => (edge.src == rootNode))
+        .map((edge: AstEdge) => edge.dst).toSeq
+      (childNodes.size == 1) && childNodes.head.isInstanceOf[NewMethod]
+    }
   }
 }
