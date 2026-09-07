@@ -4,6 +4,7 @@ import io.joern.c2cpg.astcreation.converter.{VASTPatternConverterForEmptyDefinit
 
 class VAstConverterForC(private var vAstCreator: VAstCreatorNew) extends VAstConverter(vAstCreator) {
   private val conditionalConverter = new VAstPatternConverterForConditionalMacro(vAstCreator, this)
+  super.addConditionalHandler(conditionalConverter)
   private val patterns: List[VAstPatternConverter] = List.apply(
     new VAstPatternConverterForBinaryOperators(vAstCreator, this),
     new VAstPatternConverterForCast(vAstCreator, this),
@@ -19,5 +20,4 @@ class VAstConverterForC(private var vAstCreator: VAstCreatorNew) extends VAstCon
     new VASTPatternConverterForEmptyDefinition(vAstCreator, this)
   )
   super.addPatterns(patterns)
-  super.addConditionalHandler(conditionalConverter)
 }

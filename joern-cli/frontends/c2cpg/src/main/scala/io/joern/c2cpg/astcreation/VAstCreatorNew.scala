@@ -4,7 +4,7 @@ import io.joern.c2cpg.astcreation.converter.{VAstConverter, VAstConverterState}
 import io.joern.x2cpg.datastructures.VariableScopeManager
 import io.joern.x2cpg.{Ast, AstCreatorBase, AstNodeBuilder, Defines, ValidationMode}
 import io.shiftleft.codepropertygraph.generated.{Cpg, DiffGraphBuilder, PropertyDefaults}
-import io.shiftleft.codepropertygraph.generated.nodes.{NewBlock, NewCall, NewControlStructure, NewFile, NewLocal, NewMethod, NewMethodReturn, NewModifier, NewNode, NewReturn, NewTypeRef}
+import io.shiftleft.codepropertygraph.generated.nodes.{NewBlock, NewCall, NewControlStructure, NewFile, NewLocal, NewMethod, NewMethodParameterIn, NewMethodReturn, NewModifier, NewNode, NewReturn, NewTypeRef}
 import org.slf4j.{Logger, LoggerFactory}
 import xtc.tree.Node
 
@@ -90,7 +90,7 @@ class VAstCreatorNew(
   def methodAstHelper(method: NewMethod,
                       parameters: Seq[Ast],
                       body: Ast,
-                      methodReturn: NewMethodReturn,
+                      methodReturn: NewMethodReturn | Seq[Ast],
                       modifiers: Seq[NewModifier] = Nil): Ast = {
     methodAst(method, parameters, body, methodReturn, modifiers)
   }
@@ -158,4 +158,17 @@ class VAstCreatorNew(
 
   def typeRefNodeHelper(node: Node, code: String, typeFullName: String): NewTypeRef =
     typeRefNode(node, code, typeFullName)
+    
+  def parameterInNodeHelper(node: Node,
+                            name: String,
+                            code: String,
+                            index: Int,
+                            isVariadic: Boolean,
+                            evaluationStrategy: String,
+                            typeFullName: String,
+                            dynamicTypeHintFullName: Seq[String] = Nil,
+                            line: Option[Int] = None,
+                            column: Option[Int] = None): NewMethodParameterIn = {
+    parameterInNodeCreator(node, name, code, index, isVariadic, evaluationStrategy, typeFullName, dynamicTypeHintFullName, line, column)
+  }
 }

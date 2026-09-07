@@ -206,6 +206,32 @@ trait AstNodeBuilder[Node, NodeProcessor] { this: NodeProcessor =>
     setOffset(node, node_)
   }
 
+  protected def parameterInNodeCreator(
+                                 node: Node,
+                                 name: String,
+                                 code: String,
+                                 index: Int,
+                                 isVariadic: Boolean,
+                                 evaluationStrategy: String,
+                                 typeFullName: String,
+                                 dynamicTypeHintFullName: Seq[String] = Nil,
+                                 line: Option[Int] = None,
+                                 column: Option[Int] = None
+                               ): NewMethodParameterIn = {
+    val node_ = NewMethodParameterIn()
+      .name(name)
+      .code(code)
+      .index(index)
+      .order(index)
+      .isVariadic(isVariadic)
+      .evaluationStrategy(evaluationStrategy)
+      .lineNumber(line)
+      .columnNumber(column)
+      .typeFullName(typeFullName)
+      .dynamicTypeHintFullName(dynamicTypeHintFullName)
+    setOffset(node, node_)
+  }
+
   def callNode(node: Node, code: String, name: String, methodFullName: String, dispatchType: String): NewCall =
     callNode(node, code, name, methodFullName, dispatchType, None, None)
 

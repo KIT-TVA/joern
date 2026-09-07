@@ -15,6 +15,7 @@ import scala.collection.mutable.ListBuffer
 
 class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, converter: VAstConverter)
   extends VAstPatternConverter(vAstCreator, converter, List.apply("FunctionDefinition")) {
+  private val conditionalHandler: VAstConditionalHandler = converter.getConditionalHandler
 
   private val FUNCTION_DECLARATION: Int = 0
   private val FUNCTION_CODE_INDEX: Int = 1
@@ -44,236 +45,33 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
     val methodNameRootNode: Node = functionPropertyRootNode.getNode(1).getNode(0)
     val methodParameterListRootNode: Node = functionPropertyRootNode.getNode(1).getNode(1)
 
-    val conditionalHandler: VAstConditionalHandler = converter.getConditionalHandler
+    // Checks if the methode name is Conditional.
     if (conditionalHandler.isConditionalNode(methodNameRootNode)) {
       // Translates the method declarations if the method name is conditional.
+      // Transforms the SuperC method declaration VAST with conditional method name into a SuperC VAST with conditional
+      // method declarations but unconditional method names.
       val newSubVAst: Node = conditionalHandler.createConditionalSuperCSubtree(methodNameRootNode, converterState,
                                                                                (methodNameNode: Node, state: VAstConverterState) => {
         val newFunctionDeclarator: Node = GNode.create(FUNCTION_NAME_ROOT_NODE_NAME, methodNameNode, methodParameterListRootNode)
         val newFunctionPropertyRootNode:  Node = GNode.create(FUNCTION_RETURN_TYPE_ROOT_NODE_NAME, methodReturnTypeNode, newFunctionDeclarator)
         GNode.create(FUNCTION_DEFINITION, newFunctionPropertyRootNode, methodRootCodeNode)
       })
-      
+
+      // Transforms the modified SuperC VAST into as JOERN VAST.
       Option(conditionalHandler.handelAndSimplifyConditional(newSubVAst, converterState,
         (node: Node, state: VAstConverterState) => converter.convert(node, state)))
 
     } else {
       // Translates the method declarations if the method name is not conditional.
       val methodName: String = functionPropertyRootNode.getNode(1).getNode(0).getNode(0).getString(0)
-      println(s"Methoden-Name: \"$methodName\"")
 
       // Converts the return type and determines the method Position
-      var methodLine: Int = Int.MaxValue
-      var methodColumn: Int = Int.MaxValue
-      var returnTypes: Set[String] = Set.empty[String]
       val returnTypeRootNode: Node = functionPropertyRootNode.getNode(0)
-      val createReturnTypeNodes: (Node, VAstConverterState) => Seq[Ast] = (returnTypeNode: Node, converterState: VAstConverterState) => {
-        val returnTypeLine: Int = returnTypeNode.getLocation.line
-        val returnTypeColumn: Int = returnTypeNode.getLocation.column
-        val returnType: String = returnTypeNode.getString(0)
-        returnTypes = returnTypes + returnType
+      val (returnTypeNodes: Seq[Ast], returnTypeString: String, returnTypeCode: String, methodLine: Int, methodColumn: Int)
+        = getFunctionReturn(returnTypeRootNode, converterState)
 
-        // Updates the code position of the method if the current code position does not point to the beginning of the
-        // method. This can happen when the return type is conditional because, in some situations, SuperC does not
-        // preserve the code-order of the return types in its conditional subtree.
-        if (methodLine > returnTypeLine) {
-          methodLine = returnTypeLine
-          methodColumn = returnTypeColumn
-        } else if ((methodLine == returnTypeLine) && (methodColumn > returnTypeColumn)) {
-          methodColumn = returnTypeColumn
-        }
-
-        val returnTypeStatement: NewMethodReturn = vAstCreator.methodReturnNodeHelper(superCVAst, returnType)
-          .lineNumber(returnTypeLine)
-          .columnNumber(returnTypeColumn)
-          .code(returnType)
-        Seq(vAstCreator.AstHelper(returnTypeStatement))
-      }
-      val returnTypeNodes: Seq[Ast] = if (conditionalHandler.isConditionalNode(returnTypeRootNode)) {
-        val returnNodes: Seq[Ast] = conditionalHandler.handelAndSimplifyConditional(returnTypeRootNode, converterState,
-                                                                                    createReturnTypeNodes)
-        val typesList: String = returnNodes.map((returnAst: Ast) => {
-          returnAst.root.get match {
-            case methodReturnNode: NewMethodReturn => methodReturnNode.typeFullName
-            case controlStructureNode: NewControlStructure => returnAst.edges
-              .filter((edge: AstEdge) => edge.src == controlStructureNode)
-              .map((edge: AstEdge) => edge.dst.asInstanceOf[NewMethodReturn].typeFullName).head
-          }
-        }).sorted.mkString(";")
-
-        // Creates an additional generic/multitype return node. This is necessary because JOERN expects to have only a
-        // single finale/return point with only single return type.
-        val genericReturnType: String = s"choice[$typesList]"
-        val genericReturnTypeCode: String = returnNodes.map((returnType: Ast) => returnType.root.get.properties("CODE"))
-          .mkString("\n")
-        val genericReturnNode: NewMethodReturn = vAstCreator.methodReturnNodeHelper(superCVAst, genericReturnType)
-          .lineNumber(methodLine)
-          .columnNumber(methodColumn)
-          .code(genericReturnTypeCode)
-        val genericReturnAst: Ast = vAstCreator.AstHelper(genericReturnNode)
-        Seq(genericReturnAst.withChildren(returnNodes))
-
-      } else createReturnTypeNodes(returnTypeRootNode, converterState)
-      val returnTypeString: String = toTypeString(returnTypes)
-
-      // Extracts the return type code and corrects the code field of the return node in the return-type JEORN VAST.
-      val returnTypeCode: String = returnTypeNodes.head.root.get.asInstanceOf[NewMethodReturn].code
-      returnTypeNodes.head.nodes
-        .filter((node: NewNode)=> (node.nodeKind == JOERN_METHOD_RETURN_NODE_KIND)
-          && node.label.equals(JOERN_JOERN_METHOD_RETURN_NODE_LABEL))
-        .foreach((node: NewNode) => node.asInstanceOf[NewMethodReturn].code("REF"))
-
-      // ===============================================================================================================
-
-
-      // Converts the parameters.
-      val parameterTypeListNode: Node = functionPropertyRootNode.getNode(1).getNode(1).getNode(0)
-      var parameterNodes: Seq[Ast] = Seq.empty[Ast]
-      if (parameterTypeListNode.size > 0) { // Checks if the current method does have parameters
-        // Defines the handler/method parameter extractor.
-        val methodParameterExtractor: (Node, VAstConverterState) => Seq[Ast] = (node: Node, extractorState: VAstConverterState) => {
-
-          // Defines the handler/method to create the all JOERN method parameter nodes.
-          val parameterNameRootNode: Node = node.getNode(1)
-          val methodParameterCreator: (Node, VAstConverterState) => Seq[Ast] = (parameterTypeNode: Node, state: VAstConverterState) => {
-            val parameterType: String = parameterTypeNode.getString(0)
-            val location: Location = parameterTypeNode.getLocation
-            val (line: Option[Int], column: Option[Int]) =
-              if (location == null) (None, None) else (Option(location.line), Option(location.column))
-
-            // Creates each JOERN method parameter node.
-            val creator: (Node, VAstConverterState) => Seq[Ast] = (parameterNameNode: Node, s: VAstConverterState) => {
-              // TODO: Muss hier noch die Array und Pointer Varianten behandeln.
-              val (fullParameterType: String, parameterName: String, code: String) = parameterNameNode.getName match {
-                case nodeName if nodeName.equals(POINTER_PARAMETER_DECLARATION) =>
-                  var pointerInformation: String = "*"
-                  var nextPointerNode: Node = parameterNameNode.getNode(1)
-                  while (nextPointerNode.getName.equals(POINTER_PARAMETER_DECLARATION)) {
-                    pointerInformation += "*"
-                    nextPointerNode = nextPointerNode.getNode(1)
-                  }
-                  val (arrayDimensions: String, variableName: String) = extractVariableInformation(nextPointerNode)
-                  (s"$parameterType$arrayDimensions$pointerInformation", variableName,
-                    s"$parameterType$pointerInformation $variableName$arrayDimensions")
-                case _ =>
-                  val (arrayDimensions: String, variableName: String) = extractVariableInformation(parameterNameNode)
-                  (s"$parameterType$arrayDimensions", variableName, s"$parameterType $variableName$arrayDimensions")
-              }
-
-              // The parameter index for each parameter Nod is set after all parameter nodes are translated and  in the
-              // right order because in some conditional situations the parameters in the SuperC AST may not in order.
-              val parameterNode: NewMethodParameterIn = vAstCreator.parameterInNodeHelper(node, parameterName, code,
-                -1, false, "BY_VALUE", fullParameterType, dynamicTypeHintFullName = Seq(), line=line, column=column)
-              Seq(vAstCreator.AstHelper(parameterNode))
-            }
-            if (conditionalHandler.isConditionalNode(parameterNameRootNode)) {
-              conditionalHandler.handelAndSimplifyConditional(parameterNameRootNode, state, creator)
-            } else creator(parameterNameRootNode, state)
-          }
-
-          val parameterTypeRootNode: Node = node.getNode(0)
-          if (conditionalHandler.isConditionalNode(parameterTypeRootNode)) {
-            conditionalHandler.handelAndSimplifyConditional(parameterTypeRootNode, extractorState, methodParameterCreator)
-          } else methodParameterCreator(parameterTypeRootNode, extractorState)
-        }
-
-        val parameterListNode: Node = parameterTypeListNode.getNode(0).getNode(0) // root node of all parameters (including the conditional ones)
-        val numberOfParameters: Int = parameterListNode.size
-        for (parameterNodeIndex: Int <- 0 until numberOfParameters) {
-          val parameterNode: Node = parameterListNode.get(parameterNodeIndex).asInstanceOf[Node]
-
-          // Extracts one method parameter.
-          val newParameterNodes: Seq[Ast] = if (conditionalHandler.isConditionalNode(parameterNode)) {
-            conditionalHandler.handelAndSimplifyConditional(parameterNode, converterState, methodParameterExtractor)
-          } else methodParameterExtractor(parameterNode, converterState)
-          parameterNodes = parameterNodes ++ newParameterNodes
-        }
-      }
-
-      // Sorts the parameters by is position in the method signature.
-      parameterNodes = parameterNodes.sortBy((parameterAst: Ast) => {
-        var rootNode: NewNode = parameterAst.root.get
-        if (conditionalHandler.isChoiceNode(rootNode)) {
-          rootNode = parameterAst.edges.filter((edge: AstEdge) => edge.src == rootNode).head.dst
-        }
-        val parameterNode: AstNodeNew = rootNode.asInstanceOf[AstNodeNew]
-        val line: Int = parameterNode.lineNumber.get
-        val column: Int = parameterNode.columnNumber.get
-        (line, column)
-      }).zipWithIndex.map((parameterAst: Ast, parameterIndex: Int) => {
-        var rootNode: NewNode = parameterAst.root.get
-        if (conditionalHandler.isChoiceNode(rootNode)) {
-          rootNode = parameterAst.edges.filter((edge: AstEdge) => edge.src == rootNode).head.dst
-        }
-        rootNode.asInstanceOf[NewMethodParameterIn].index(parameterIndex + 1)
-        parameterAst
-      })
-
-      // Creates the parameter type signature.
-      // Determines all possible parameter type orders.
-      var parameterConfigurationMap: Map[String, Seq[String]] = Map.empty[String, Seq[String]]
-      for (parameter: Ast <- parameterNodes) {
-        parameter.root.get match {
-          case parameterNode: NewMethodParameterIn =>
-            // If the parameter is unconditional.
-            val newParamType: Seq[String] = Seq(parameterNode.typeFullName)
-            if (parameterConfigurationMap.isEmpty) parameterConfigurationMap = Map("" -> newParamType) else {
-              parameterConfigurationMap = parameterConfigurationMap.map((condition: String, paramTypes: Seq[String]) =>
-                (condition, paramTypes ++ newParamType))
-            }
-
-          case conditionalNode: NewControlStructure =>
-            // If the parameter is conditional.
-            val parameterCondition: String = conditionalHandler.getFirstPresenceConditions(conditionalNode)
-            val parameterNode: NewMethodParameterIn = parameter.edges
-              .filter((edge: AstEdge) => edge.src.equals(conditionalNode)).head.dst.asInstanceOf[NewMethodParameterIn]
-            val newParamType: Seq[String] = Seq(parameterNode.typeFullName)
-            if (parameterConfigurationMap.isEmpty) {
-              parameterConfigurationMap = Map("" -> Seq("none"), parameterCondition -> newParamType)
-            } else {
-              parameterConfigurationMap = parameterConfigurationMap.flatMap((condition: String, paramTypes: Seq[String]) => {
-                // The condition comparison based on the conditional string is possible because the Conditionality
-                // ensures a deterministic order of the macro-variables in the conditional expressions.
-                if (condition.contains(parameterCondition)) Seq((condition, paramTypes ++ newParamType))  // Condition already contained.
-                else if (combinedConditionSatisfiable(condition, parameterCondition)) Seq((condition, paramTypes))  // Combined condition not satisfiable.
-                else Seq((condition, paramTypes), (s"$condition ;; $parameterCondition", paramTypes ++ newParamType))  // ";;" is a unique conditional separator, that is not part of an expression
-              })
-            }
-        }
-      }
-
-      // Removes any “none” parameter that is outdated.
-      val parameterConfigurations: Seq[Seq[String]] = parameterConfigurationMap.toSeq
-        .map((condition: String, parameterTypes: Seq[String]) => {
-          if (parameterTypes.size > 1 && parameterTypes.head.equals("none")) parameterTypes.tail
-          else parameterTypes
-        })
-
-      // Determines the maximal number of parameters.
-      val maxNumberOfParameters: Int = if (parameterConfigurations.isEmpty) 1 else parameterConfigurations
-        .map((parameterTypes: Seq[String]) => parameterTypes.size)
-        .sorted(Ordering[Int].reverse).head
-
-      // Determines the unconditional generic parameter type signature.
-      val parameterSignatureString: String = parameterConfigurations.flatMap((parameterTypes: Seq[String]) => {
-          (parameterTypes ++ Seq.fill(maxNumberOfParameters - parameterTypes.size)("none")).zipWithIndex
-        }).groupBy((parameterTypes: String, index: Int) => index)
-        .map((index: Int, parameterTypes: Seq[(String, Int)]) => {
-          val parameterTypeList: Seq[String] = parameterTypes.map((parameterType: String, index: Int) => parameterType)
-            .distinct.sorted
-          if (parameterTypeList.size == 1 && !parameterTypeList.head.equals("none")) parameterTypeList.head else {
-            // If the parameter type a the current parameter position is conditional.
-            val parameterTypeNames: String = parameterTypeList.mkString(";")
-            s"choice[$parameterTypeNames]"
-          }
-        }).mkString(",")
-
-      // Create the parameter definition code.
-      val parameterNodeCode: String = parameterNodes.map((parameter: Ast) => parameter.root.get match {
-        case parameterNode: NewMethodParameterIn => parameterNode.code
-        case conditionalNode: NewControlStructure => "\n" + conditionalNode.code + "\n"
-      }).mkString(", ")
-
+      // Translates the function parameters.
+      val (parameterNodes: Seq[Ast], parameterSignatureString, parameterNodeCode) = getFunctionParameters(functionPropertyRootNode, converterState)
 
       // Translates the method instructions of the current method.
       val instructionSuperCRootNode: Node = superCVAst.getNode(1)
@@ -291,8 +89,8 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
         .code(methodeCode)
         .fullName(methodName)
         .signature(methodSignature)
-        .lineNumber(2)
-        .columnNumber(2)
+        .lineNumber(methodLine)
+        .columnNumber(methodColumn)
 
       // Builds the method declaration VAST.
       val method: Ast = vAstCreator.methodAstHelper(
@@ -307,29 +105,247 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
   }
 
   /**
-   * Check if a code block has to be created.
+   * Converts the method return type SuperC VAST into a JOERN VAST, determines the code position of the method
+   * declaration and computes the return type code.
    *
-   * @param methodeInstructionAsts All method instruction ASTs.
-   * @return Returns `true` if a code block has to be created otherwise `false` is returned.
+   * @param returnTypeRootNode The SuperC root node of the method return type VAST.
+   * @param converterState     The current converter state
+   * @return Returns the method return type information as a tuple.
+   *         (return type JOERN AST, return type (if required generic), return type code, method begin line, method, begin column)
    */
-  private def requireCodeBlock(methodeInstructionAsts: Seq[Ast]): Boolean = {
-    if (methodeInstructionAsts.size != 1) {
-      true
-    } else {
-      val astRootNode: Option[NewNode] = methodeInstructionAsts.head.root
-      astRootNode.isEmpty
-        || !((astRootNode.get.nodeKind == JOERN_BLOCK_NODE_KIND) && astRootNode.get.label.equals(JOERN_BLOCK_NODE_LABEL))
-        || !converter.getConditionalHandler.isChoiceNode(astRootNode.get)
+  private def getFunctionReturn(returnTypeRootNode: Node, converterState: VAstConverterState): (Seq[Ast], String, String, Int, Int) = {
+    // Initial definition of general method node properties that the translation of the method return nodes will
+    // retrieve on the fly.
+    var methodLine: Int = Int.MaxValue
+    var methodColumn: Int = Int.MaxValue
+    var returnTypes: Set[String] = Set.empty[String]
+
+    // Defines the method return tyoe node creator method.
+    val createReturnTypeNodes: (Node, VAstConverterState) => Seq[Ast] = (returnTypeNode: Node, converterState: VAstConverterState) => {
+      val returnTypeLine: Int = returnTypeNode.getLocation.line
+      val returnTypeColumn: Int = returnTypeNode.getLocation.column
+      val returnType: String = returnTypeNode.getString(0)
+      returnTypes = returnTypes + returnType
+
+      // Updates the code position of the method if the current code position does not point to the beginning of the
+      // method. This can happen when the return type is conditional because, in some situations, SuperC does not
+      // preserve the code-order of the return types in its conditional subtree.
+      if (methodLine > returnTypeLine) {
+        methodLine = returnTypeLine
+        methodColumn = returnTypeColumn
+      } else if ((methodLine == returnTypeLine) && (methodColumn > returnTypeColumn)) {
+        methodColumn = returnTypeColumn
+      }
+
+      val returnTypeStatement: NewMethodReturn = vAstCreator.methodReturnNodeHelper(returnTypeNode, returnType)
+        .lineNumber(returnTypeLine)
+        .columnNumber(returnTypeColumn)
+        .code(returnType)
+      Seq(vAstCreator.AstHelper(returnTypeStatement))
     }
-  } 
-  
-  private def getCode(returnType: String,
-                      functionName: String,
-                      parameters: Seq[(String, String)],
-                      functionCode: String): String = {
-    val parameterString: String = parameters.map((paramType, paramName) => s"${paramType} ${paramName}").mkString(", ")
-    val codeBlock: String = functionCode.replace("\n", s"\n${this.BLOCK_SPACING}")
-    s"${returnType} ${functionName}(${parameterString}) {\n${codeBlock}\n}"
+
+    // Converts all method return type node.
+    val returnTypeNodes: Seq[Ast] = if (conditionalHandler.isConditionalNode(returnTypeRootNode)) {
+      val returnNodes: Seq[Ast] = conditionalHandler.handelAndSimplifyConditional(returnTypeRootNode, converterState,
+        createReturnTypeNodes)
+      val typesList: String = returnNodes.map((returnAst: Ast) => {
+        returnAst.root.get match {
+          case methodReturnNode: NewMethodReturn => methodReturnNode.typeFullName
+          case controlStructureNode: NewControlStructure => returnAst.edges
+            .filter((edge: AstEdge) => edge.src == controlStructureNode)
+            .map((edge: AstEdge) => edge.dst.asInstanceOf[NewMethodReturn].typeFullName).head
+        }
+      }).sorted.mkString(";")
+
+      // Creates an additional generic/multitype return node. This is necessary because JOERN expects to have only a
+      // single finale/return point with only single return type.
+      val genericReturnType: String = s"choice[$typesList]"
+      val genericReturnTypeCode: String = returnNodes.map((returnType: Ast) => returnType.root.get.properties("CODE"))
+        .mkString("\n")
+      val genericReturnNode: NewMethodReturn = vAstCreator.methodReturnNodeHelper(returnTypeRootNode, genericReturnType)
+        .lineNumber(methodLine)
+        .columnNumber(methodColumn)
+        .code(genericReturnTypeCode)
+      val genericReturnAst: Ast = vAstCreator.AstHelper(genericReturnNode)
+      Seq(genericReturnAst.withChildren(returnNodes))
+
+    } else createReturnTypeNodes(returnTypeRootNode, converterState)
+    val returnTypeString: String = toTypeString(returnTypes)
+
+    // Extracts the return type code and corrects the code field of the return node in the return-type JEORN VAST.
+    val returnTypeCode: String = returnTypeNodes.head.root.get.asInstanceOf[NewMethodReturn].code
+    returnTypeNodes.head.nodes
+      .filter((node: NewNode) => (node.nodeKind == JOERN_METHOD_RETURN_NODE_KIND)
+        && node.label.equals(JOERN_JOERN_METHOD_RETURN_NODE_LABEL))
+      .foreach((node: NewNode) => node.asInstanceOf[NewMethodReturn].code("REF"))
+
+    // Returns all method return information
+    (returnTypeNodes, returnTypeString, returnTypeCode, methodLine, methodColumn)
+  }
+
+  private def toTypeString(types: Set[String]): String = if (types.size > 1) {
+    s"choice[${types.toSeq.sorted.mkString(CHOICE_TYPE_SEPARATOR)}]"
+  } else types.mkString
+
+  /**
+   * Converts the method parameter SuperC VAST into a JOERN VAST and computes the parameter defintion code.
+   *
+   * @param functionPropertyRootNode The SuperC root node of the method parameter VAST.
+   * @param converterState     The current converter state
+   * @return Returns the method parameter information as a tuple.
+   *         (method parameter JOERN nodes, methpod parameter type signature (if required generic), method parameter code)
+   */
+  private def getFunctionParameters(functionPropertyRootNode: Node, converterState: VAstConverterState): (Seq[Ast], String, String) = {
+    // Converts the parameters.
+    val parameterTypeListNode: Node = functionPropertyRootNode.getNode(1).getNode(1).getNode(0)
+    var parameterNodes: Seq[Ast] = Seq.empty[Ast]
+    if (parameterTypeListNode.size > 0) { // Checks if the current method does have parameters
+      // Defines the handler/method parameter extractor.
+      val methodParameterExtractor: (Node, VAstConverterState) => Seq[Ast] = (node: Node, extractorState: VAstConverterState) => {
+
+        // Defines the handler/method to create the all JOERN method parameter nodes.
+        val parameterNameRootNode: Node = node.getNode(1)
+        val methodParameterCreator: (Node, VAstConverterState) => Seq[Ast] = (parameterTypeNode: Node, state: VAstConverterState) => {
+          val parameterType: String = parameterTypeNode.getString(0)
+          val location: Location = parameterTypeNode.getLocation
+          val (line: Option[Int], column: Option[Int]) =
+            if (location == null) (None, None) else (Option(location.line), Option(location.column))
+
+          // Creates each JOERN method parameter node.
+          val creator: (Node, VAstConverterState) => Seq[Ast] = (parameterNameNode: Node, s: VAstConverterState) => {
+            // TODO: Muss hier noch die Array und Pointer Varianten behandeln.
+            val (fullParameterType: String, parameterName: String, code: String) = parameterNameNode.getName match {
+              case nodeName if nodeName.equals(POINTER_PARAMETER_DECLARATION) =>
+                var pointerInformation: String = "*"
+                var nextPointerNode: Node = parameterNameNode.getNode(1)
+                while (nextPointerNode.getName.equals(POINTER_PARAMETER_DECLARATION)) {
+                  pointerInformation += "*"
+                  nextPointerNode = nextPointerNode.getNode(1)
+                }
+                val (arrayDimensions: String, variableName: String) = extractVariableInformation(nextPointerNode)
+                (s"$parameterType$arrayDimensions$pointerInformation", variableName,
+                  s"$parameterType$pointerInformation $variableName$arrayDimensions")
+              case _ =>
+                val (arrayDimensions: String, variableName: String) = extractVariableInformation(parameterNameNode)
+                (s"$parameterType$arrayDimensions", variableName, s"$parameterType $variableName$arrayDimensions")
+            }
+
+            // The parameter index for each parameter Nod is set after all parameter nodes are translated and  in the
+            // right order because in some conditional situations the parameters in the SuperC AST may not in order.
+            val parameterNode: NewMethodParameterIn = vAstCreator.parameterInNodeHelper(node, parameterName, code,
+              -1, false, "BY_VALUE", fullParameterType, dynamicTypeHintFullName = Seq(), line = line, column = column)
+            Seq(vAstCreator.AstHelper(parameterNode))
+          }
+          if (conditionalHandler.isConditionalNode(parameterNameRootNode)) {
+            conditionalHandler.handelAndSimplifyConditional(parameterNameRootNode, state, creator)
+          } else creator(parameterNameRootNode, state)
+        }
+
+        val parameterTypeRootNode: Node = node.getNode(0)
+        if (conditionalHandler.isConditionalNode(parameterTypeRootNode)) {
+          conditionalHandler.handelAndSimplifyConditional(parameterTypeRootNode, extractorState, methodParameterCreator)
+        } else methodParameterCreator(parameterTypeRootNode, extractorState)
+      }
+
+      val parameterListNode: Node = parameterTypeListNode.getNode(0).getNode(0) // root node of all parameters (including the conditional ones)
+      val numberOfParameters: Int = parameterListNode.size
+      for (parameterNodeIndex: Int <- 0 until numberOfParameters) {
+        val parameterNode: Node = parameterListNode.get(parameterNodeIndex).asInstanceOf[Node]
+
+        // Extracts one method parameter.
+        val newParameterNodes: Seq[Ast] = if (conditionalHandler.isConditionalNode(parameterNode)) {
+          conditionalHandler.handelAndSimplifyConditional(parameterNode, converterState, methodParameterExtractor)
+        } else methodParameterExtractor(parameterNode, converterState)
+        parameterNodes = parameterNodes ++ newParameterNodes
+      }
+    }
+
+    // Sorts the parameters by is position in the method signature.
+    parameterNodes = parameterNodes.sortBy((parameterAst: Ast) => {
+      var rootNode: NewNode = parameterAst.root.get
+      if (conditionalHandler.isChoiceNode(rootNode)) {
+        rootNode = parameterAst.edges.filter((edge: AstEdge) => edge.src == rootNode).head.dst
+      }
+      val parameterNode: AstNodeNew = rootNode.asInstanceOf[AstNodeNew]
+      val line: Int = parameterNode.lineNumber.get
+      val column: Int = parameterNode.columnNumber.get
+      (line, column)
+    }).zipWithIndex.map((parameterAst: Ast, parameterIndex: Int) => {
+      var rootNode: NewNode = parameterAst.root.get
+      if (conditionalHandler.isChoiceNode(rootNode)) {
+        rootNode = parameterAst.edges.filter((edge: AstEdge) => edge.src == rootNode).head.dst
+      }
+      rootNode.asInstanceOf[NewMethodParameterIn].index(parameterIndex + 1)
+      parameterAst
+    })
+
+    // Creates the parameter type signature.
+    // Determines all possible parameter type orders.
+    var parameterConfigurationMap: Map[String, Seq[String]] = Map.empty[String, Seq[String]]
+    for (parameter: Ast <- parameterNodes) {
+      parameter.root.get match {
+        case parameterNode: NewMethodParameterIn =>
+          // If the parameter is unconditional.
+          val newParamType: Seq[String] = Seq(parameterNode.typeFullName)
+          if (parameterConfigurationMap.isEmpty) parameterConfigurationMap = Map("" -> newParamType) else {
+            parameterConfigurationMap = parameterConfigurationMap.map((condition: String, paramTypes: Seq[String]) =>
+              (condition, paramTypes ++ newParamType))
+          }
+
+        case conditionalNode: NewControlStructure =>
+          // If the parameter is conditional.
+          val parameterCondition: String = conditionalHandler.getFirstPresenceConditions(conditionalNode)
+          val parameterNode: NewMethodParameterIn = parameter.edges
+            .filter((edge: AstEdge) => edge.src.equals(conditionalNode)).head.dst.asInstanceOf[NewMethodParameterIn]
+          val newParamType: Seq[String] = Seq(parameterNode.typeFullName)
+          if (parameterConfigurationMap.isEmpty) {
+            parameterConfigurationMap = Map("" -> Seq("none"), parameterCondition -> newParamType)
+          } else {
+            parameterConfigurationMap = parameterConfigurationMap.flatMap((condition: String, paramTypes: Seq[String]) => {
+              // The condition comparison based on the conditional string is possible because the Conditionality
+              // ensures a deterministic order of the macro-variables in the conditional expressions.
+              if (condition.contains(parameterCondition)) Seq((condition, paramTypes ++ newParamType)) // Condition already contained.
+              else if (combinedConditionSatisfiable(condition, parameterCondition)) Seq((condition, paramTypes)) // Combined condition not satisfiable.
+              else Seq((condition, paramTypes), (s"$condition ;; $parameterCondition", paramTypes ++ newParamType)) // ";;" is a unique conditional separator, that is not part of an expression
+            })
+          }
+      }
+    }
+
+    // Removes any “none” parameter that is outdated. TODO: Internal data processing
+    val parameterConfigurations: Seq[Seq[String]] = parameterConfigurationMap.toSeq
+      .map((condition: String, parameterTypes: Seq[String]) => {
+        if (parameterTypes.size > 1 && parameterTypes.head.equals("none")) parameterTypes.tail
+        else parameterTypes
+      })
+
+    // Determines the maximal number of parameters.
+    val maxNumberOfParameters: Int = if (parameterConfigurations.isEmpty) 1 else parameterConfigurations
+      .map((parameterTypes: Seq[String]) => parameterTypes.size)
+      .sorted(Ordering[Int].reverse).head
+
+    // Determines the unconditional generic parameter type signature.
+    val parameterSignatureString: String = parameterConfigurations.flatMap((parameterTypes: Seq[String]) => {
+        (parameterTypes ++ Seq.fill(maxNumberOfParameters - parameterTypes.size)("none")).zipWithIndex
+      }).groupBy((parameterTypes: String, index: Int) => index)
+      .map((index: Int, parameterTypes: Seq[(String, Int)]) => {
+        val parameterTypeList: Seq[String] = parameterTypes.map((parameterType: String, index: Int) => parameterType)
+          .distinct.sorted
+        if (parameterTypeList.size == 1 && !parameterTypeList.head.equals("none")) parameterTypeList.head else {
+          // If the parameter type a the current parameter position is conditional.
+          val parameterTypeNames: String = parameterTypeList.mkString(";")
+          s"choice[$parameterTypeNames]"
+        }
+      }).mkString(",")
+
+    // Create the parameter definition code.
+    val parameterNodeCode: String = parameterNodes.map((parameter: Ast) => parameter.root.get match {
+      case parameterNode: NewMethodParameterIn => parameterNode.code
+      case conditionalNode: NewControlStructure => "\n" + conditionalNode.code + "\n"
+    }).mkString(", ")
+
+    // Returns the importen parts.
+    (parameterNodes, parameterSignatureString, parameterNodeCode)
   }
 
   private def extractVariableInformation(parameterNameNode: Node): (String, String) = {
@@ -353,14 +369,10 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
         (variableArrayInformation, parameterNameNode.getNode(0).getNode(0).getString(0))
     }
   }
-  
-  private def toTypeString(types: Set[String]): String = if (types.size > 1) {
-    s"choice[${types.toSeq.sorted.mkString(CHOICE_TYPE_SEPARATOR)}]"
-  } else types.mkString
 
   private def combinedConditionSatisfiable(conditions: String, parameterCondition: String): Boolean = {
-    // TODO: Muss noch Verfolständigt werden; Die aktuelle implementierung ist fehleraft und unvollständig (zu restikive/ erkennt nicht die eigentlichen fälle
-    //  verwebde logic expretion handeler for detection
+    // TODO: Muss noch vervollständigt werden; die aktuelle Implementierung ist fehlerhaft und unvollständig
+    //  (zu restriktiv/erkennt nicht die eigentlichen Fälle). Verwende Logic Expression Handler für Detection.
     parameterCondition.replace(" ", "").split("\\|\\|").flatMap((expression: String) => expression.split("&&"))
       .exists((logicVariable: String) => {
         val invertedVariable: String = if (logicVariable.startsWith("!")) logicVariable.substring(1) else s"!$logicVariable"
@@ -374,7 +386,12 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
   }
 
   /**
-   * Translates the methode instrctions from the SuperC format into the JOERN format.
+   * Translates the methode instructions from the SuperC format into the JOERN format. This implementation simplifies
+   * and combines conditional instruction sequences while preserving the code instruction order.
+   *
+   * **Important Notes:**
+   * This implementation generates the code of the sub AST. The generated code does not necessarily match the actual
+   * source code, it is only semantically identical.
    *
    * @param instructionSuperCRootNode The SuperC method instruction root node.
    * @param converterState The converter state that is passed to the `VAstPatternConverterForFunctionDeclarations`.
@@ -472,6 +489,23 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
         case None => "<empty>"
       }
       (rootAst, code)
+    }
+  }
+
+  /**
+   * Check if a code block has to be created.
+   *
+   * @param methodeInstructionAsts All method instruction ASTs.
+   * @return Returns `true` if a code block has to be created otherwise `false` is returned.
+   */
+  private def requireCodeBlock(methodeInstructionAsts: Seq[Ast]): Boolean = {
+    if (methodeInstructionAsts.size != 1) {
+      true
+    } else {
+      val astRootNode: Option[NewNode] = methodeInstructionAsts.head.root
+      astRootNode.isEmpty
+        || !((astRootNode.get.nodeKind == JOERN_BLOCK_NODE_KIND) && astRootNode.get.label.equals(JOERN_BLOCK_NODE_LABEL))
+        || !converter.getConditionalHandler.isChoiceNode(astRootNode.get)
     }
   }
 }
