@@ -46,7 +46,9 @@ object TestUtil {
 
   def generateVASTDot(cCode: String, cFileName: Option[String], onlyGlobalGraph: Boolean): (String, String) = {
     val (superCDotGraph, vcpg) = generateVCPG(cCode, cFileName = cFileName, onlyVAST = true)
-    val astDotGraphs: Iterator[String] = DotAstGenerator.dotAst(vcpg, extended_view = true)
+    // val astDotGraphs: Iterator[String] = DotAstGenerator.dotAst(vcpg, extendedView = true)
+    val astDotGraphs: Iterator[String] = DotCpg14Generator.toDotCpg14(vcpg, extendedView=true, withColoring=true,
+                                                                      forceTreeStructure=true)
     if (onlyGlobalGraph) {
       (superCDotGraph,
         astDotGraphs.filter(dotGraph => dotGraph.startsWith(s"digraph \"$GLOBAL_DOT_GRAPH_IDENTIFIER\" {")).mkString)

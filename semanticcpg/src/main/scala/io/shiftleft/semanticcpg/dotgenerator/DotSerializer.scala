@@ -81,15 +81,33 @@ object DotSerializer {
 
 
   def dotGraph(root: Option[AstNode] = None, graph: Graph,
-               withEdgeTypes: Boolean = false, extended_view: Boolean = false): String = {
+               withEdgeTypes: Boolean = false, extendedView: Boolean = false, withColoring: Boolean = false,
+               forceTreeStructure: Boolean = false): String = {
     val sb = root match {
       case Some(r) => namedGraphBegin(r)
       case None => defaultGraphBegin()
     }
 
-    sb.append(s"""node [shape="rect"];  \n""")
-    val nodeStrings = graph.vertices.map(node => nodeToDot(node, extended_view))
-    val edgeStrings = graph.edges.map(e => edgeToDot(e, withEdgeTypes))
+    sb.append(s"""node [shape="rect"];\n""")
+    if (forceTreeStructure) {
+      val astEdges: List[Edge] = graph.edges.filter((edge: Edge) => edge.edgeType.equals("AST"))
+      val groupedNodes: Map[Long, List[Long]] = astEdges.groupBy((edge: Edge) => edge.src.id)
+        .map((parentNodeId: Long, edges: List[Edge]) => (parentNodeId, edges.map((edge: Edge) => edge.dst.id)))
+      var workQueue: Seq[Long] = graph.vertices
+        .filterNot((node: StoredNode) => astEdges.exists((edge: Edge) => edge.dst == node))
+        .map((node: StoredNode) => node.id)
+      var nodeLevels: Seq[String] = Seq.empty[String]
+      while (workQueue.nonEmpty) {
+        val nodeIdGroup: String = workQueue.mkString(" ; ")
+        nodeLevels = nodeLevels ++ Seq(s"{ rank=same; ${nodeIdGroup} }")
+        workQueue = workQueue.flatMap((nodeId: Long) => groupedNodes.getOrElse(nodeId, Seq.empty[Long]))
+      }
+      val nodeLevelGroups = nodeLevels.mkString("\n")
+      sb.append("rankdir=\"TB\";\n" + nodeLevelGroups + "\n")
+    }
+
+    val nodeStrings = graph.vertices.map(node => nodeToDot(node, withColoring, extendedView))
+    val edgeStrings = graph.edges.map(e => edgeToDot(e, withEdgeTypes, withColoring))
     val subgraphStrings = graph.subgraph.zipWithIndex.map { case ((subgraph, nodes), idx) =>
       nodesToSubGraphs(subgraph, nodes, idx)
     }
@@ -154,8 +172,8 @@ object DotSerializer {
     }
   }
 
-  private def nodeToDot(node: StoredNode, extended_view: Boolean = false): String = {
-    if (extended_view) {
+  private def nodeToDot(node: StoredNode, withColoring: Boolean = false, extendedView: Boolean = false): String = {
+    var nodeInformation: String = if (extendedView) {
       val className: String = node.getClass.toString.replace("<", "&lt;").replace(">", "&gt;").replace("&", "\t&amp;")
       var debugParam = "Debug parameters:"
       for (entry <- node._debugChildren()) {
@@ -174,7 +192,7 @@ object DotSerializer {
           case e if e.toString.startsWith("POST_DOMINATE") => ""
           case e if e.toString.startsWith("ARGUMENT") => ""
           case e =>
-            val debugParameters: String  = e.toString
+            val debugParameters: String = e.toString
               .replace("<", "&lt;")
               .replace(">", "&gt;")
               .replace("&", "\t&amp;")
@@ -184,55 +202,69 @@ object DotSerializer {
         debugParam = debugParam + newP
       }
 
-      val style: String = node match {
-        case n: Method => " color=\"#8cb63c\" style=filled fillcolor=\"#e8f5d8\""
-        case n: MethodParameterIn => " color=\"#8cb63c\" style=filled fillcolor=\"#e8f5d8\""
-        case n: MethodReturn => " color=\"#8cb63c\" style=filled fillcolor=\"#e8f5d8\""
-        case n: Call =>
-          if (n._debugChildren().exists(e => e.toString.startsWith("NAME=<"))) {
-            ""
-          } else {
-            " color=\"#009682\" style=filled fillcolor=\"#d9f1e6\""
-          }
-        case n: Return => " color=\"#23a1e0\" style=filled fillcolor=\"#dcf2fb\""
-        case n: JumpTarget =>
-          if (n._debugChildren().exists(e => e.toString.startsWith("PARSER_TYPE_NAME=CASTLabelStatement"))) {
-            " color=\"#a97e23\" style=filled fillcolor=\"#f0e6d2\""
-          } else {
-            " color=\"#4664AA\" style=filled fillcolor=\"#e0e3f4\""
-          }
-        case n: Literal => " color=\"#df9b1b\" style=filled fillcolor=\"#fdecd2\""
-        case n: Identifier => " color=\"#df9b1b\" style=filled fillcolor=\"#fdecd2\""
-        case n: ControlStructure =>
-          if (n._debugChildren().exists(e => e.toString.startsWith("CONTROL_STRUCTURE_TYPE=GOTO"))) {
-            " color=\"#a97e23\" style=filled fillcolor=\"#f0e6d2\""
-          } else if (n._debugChildren().exists(e => e.toString.startsWith("CONTROL_STRUCTURE_TYPE=BREAK"))) {
-            " color=\"#23a1e0\" style=filled fillcolor=\"#dcf2fb\""
-          } else if (n._debugChildren().exists(e => e.toString.startsWith("CONTROL_STRUCTURE_TYPE=CONTINUE"))) {
-            " color=\"#23a1e0\" style=filled fillcolor=\"#dcf2fb\""
-          } else if (n._debugChildren().exists(e => e.toString.startsWith("CONTROL_STRUCTURE_TYPE=CHOICE"))) {
-            " color=\"#a3107c\" style=filled fillcolor=\"#f2d6ed\""
-          } else {
-            " color=\"#4664AA\" style=filled fillcolor=\"#e0e3f4\""
-          }
-        case _ => ""
-      }
+      // Assembles the Nod information string.
+      s"${className}<br/><b>${stringRepr(node)}</b><br/>${debugParam}"
+    } else stringRepr(node)
 
-      var nodeInformation: String = stringRepr(node)
-      if (nodeInformation.isEmpty) nodeInformation = " "
-      s""""${node.id}" [label = <${className}<br/><b>${nodeInformation}</b><br/>${debugParam}> ${style}]""".stripMargin
-    } else {
-      s""""${node.id}" [label = <${stringRepr(node)}> ]""".stripMargin
-    }
+    val style: String = if (withColoring) node match {
+      case n: Method => " color=\"#8cb63c\" style=filled fillcolor=\"#e8f5d8\""
+      case n: MethodParameterIn => " color=\"#8cb63c\" style=filled fillcolor=\"#e8f5d8\""
+      case n: MethodReturn => " color=\"#8cb63c\" style=filled fillcolor=\"#e8f5d8\""
+      case n: Call =>
+        if (n._debugChildren().exists(e => e.toString.startsWith("NAME=<"))) {
+          ""
+        } else {
+          " color=\"#009682\" style=filled fillcolor=\"#d9f1e6\""
+        }
+      case n: Return => " color=\"#23a1e0\" style=filled fillcolor=\"#dcf2fb\""
+      case n: JumpTarget =>
+        if (n._debugChildren().exists(e => e.toString.startsWith("PARSER_TYPE_NAME=CASTLabelStatement"))) {
+          " color=\"#a97e23\" style=filled fillcolor=\"#f0e6d2\""
+        } else {
+          " color=\"#4664AA\" style=filled fillcolor=\"#e0e3f4\""
+        }
+      case n: Literal => " color=\"#df9b1b\" style=filled fillcolor=\"#fdecd2\""
+      case n: Identifier => " color=\"#df9b1b\" style=filled fillcolor=\"#fdecd2\""
+      case n: ControlStructure =>
+        if (n._debugChildren().exists(e => e.toString.startsWith("CONTROL_STRUCTURE_TYPE=GOTO"))) {
+          " color=\"#a97e23\" style=filled fillcolor=\"#f0e6d2\""
+        } else if (n._debugChildren().exists(e => e.toString.startsWith("CONTROL_STRUCTURE_TYPE=BREAK"))) {
+          " color=\"#23a1e0\" style=filled fillcolor=\"#dcf2fb\""
+        } else if (n._debugChildren().exists(e => e.toString.startsWith("CONTROL_STRUCTURE_TYPE=CONTINUE"))) {
+          " color=\"#23a1e0\" style=filled fillcolor=\"#dcf2fb\""
+        } else if (n._debugChildren().exists(e => e.toString.startsWith("CONTROL_STRUCTURE_TYPE=CHOICE"))) {
+          " color=\"#a3107c\" style=filled fillcolor=\"#f2d6ed\""
+        } else {
+          " color=\"#4664AA\" style=filled fillcolor=\"#e0e3f4\""
+        }
+      case _ => ""
+    } else ""
+
+    // Creates the Node entry.
+    if (nodeInformation.isEmpty) nodeInformation = " "
+    if  (withColoring) s""""${node.id}" [label = <$nodeInformation> $style]""".stripMargin
+    else s""""${node.id}" [label = <$nodeInformation>]""".stripMargin
   }
 
-  private def edgeToDot(edge: Edge, withEdgeTypes: Boolean): String = {
+  private def edgeToDot(edge: Edge, withEdgeTypes: Boolean, withColoring: Boolean): String = {
+    val edgeIndex: String = if (edge.edgeType.equals("AST")) s"[${edge.src._astOut.toSeq.indexOf(edge.dst)}] " else ""
     val edgeLabel = if (withEdgeTypes) {
       edge.edgeType + ": " + StringEscapeUtils.escapeHtml4(edge.label)
     } else {
       StringEscapeUtils.escapeHtml4(edge.label)
     }
-    val labelStr = Some(s""" [ label = "$edgeLabel"] """).filter(_ => edgeLabel != "").getOrElse("")
+    val edgeColor: String = if (withColoring) {
+      edge.edgeType match {
+        case edgeType if edgeType.equals("AST") => "#009682"
+        case edgeType if edgeType.equals("CFG") => "#4664aa"
+        case edgeType if edgeType.equals("CDG") => "#a3107c"
+        case edgeType if edgeType.equals("DDG") => "#a3107c"
+        case _ => "#000000"
+      }
+    } else "#000000"
+
+    val labelStr = Some(s""" [ label = "$edgeIndex$edgeLabel" color="$edgeColor" fontcolor="$edgeColor"] """)
+      .filter(_ => edgeLabel != "").getOrElse("")
     s"""  "${edge.src.id}" -> "${edge.dst.id}" """ + labelStr
   }
 

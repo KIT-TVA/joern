@@ -8,7 +8,7 @@ object DotAstGenerator {
 
   def dotAst[T <: AstNode](traversal: Iterator[T], extended_view: Boolean = false,
                            onlyGlobalGraph: Boolean = false): Iterator[String] = {
-    val astDotGraphs: Iterator[String] = traversal.map(e => dotAst(e, extended_view = extended_view))
+    val astDotGraphs: Iterator[String] = traversal.map(e => dotAst(e, extendedView = extended_view))
     if (onlyGlobalGraph) {
       astDotGraphs.filter(dotGraph => dotGraph.startsWith(s"digraph \"$GLOBAL_DOT_GRAPH_IDENTIFIER\" {"))
     } else {
@@ -16,9 +16,9 @@ object DotAstGenerator {
     }
   }
 
-  def dotAst(astRoot: AstNode, extended_view: Boolean): String = {
+  def dotAst(astRoot: AstNode, extendedView: Boolean): String = {
     val ast = new AstGenerator().generate(astRoot)
-    DotSerializer.dotGraph(Option(astRoot), ast, extended_view=extended_view)
+    DotSerializer.dotGraph(Option(astRoot), ast, withEdgeTypes=true, extendedView=extendedView)
   }
 
   def dotAst(astRoot: AstNode): String = {
