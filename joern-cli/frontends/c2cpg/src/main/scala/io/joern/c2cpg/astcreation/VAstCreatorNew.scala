@@ -4,7 +4,7 @@ import io.joern.c2cpg.astcreation.converter.{VAstConverter, VAstConverterState}
 import io.joern.x2cpg.datastructures.VariableScopeManager
 import io.joern.x2cpg.{Ast, AstCreatorBase, AstNodeBuilder, Defines, ValidationMode}
 import io.shiftleft.codepropertygraph.generated.{Cpg, DiffGraphBuilder, PropertyDefaults}
-import io.shiftleft.codepropertygraph.generated.nodes.{NewBlock, NewCall, NewControlStructure, NewFile, NewLocal, NewMethod, NewMethodParameterIn, NewMethodReturn, NewModifier, NewNode, NewReturn, NewTypeRef}
+import io.shiftleft.codepropertygraph.generated.nodes.{NewBlock, NewCall, NewControlStructure, NewFile, NewLocal, NewMethod, NewMethodParameterIn, NewMethodRef, NewMethodReturn, NewModifier, NewNode, NewReturn, NewTypeRef}
 import org.slf4j.{Logger, LoggerFactory}
 import xtc.tree.Node
 
@@ -129,6 +129,10 @@ class VAstCreatorNew(
                              column: Option[Int] = None
                             ): NewMethodReturn = {
     methodReturnNodeCreator(node, typeFullName, dynamicTypeHintFullName, line, column)
+  }
+  
+  def methodRefNodeHelper(node: Node, code: String, methodFullName: String, typeFullName: String): NewMethodRef = {
+    methodRefNode(node, code, methodFullName, typeFullName)
   }
 
 
