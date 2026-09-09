@@ -11,6 +11,7 @@ import scala.collection.mutable.ListBuffer
 class VAstConverter(private val vAstCreator: VAstCreatorNew) {
 
   private var conditionalHandler: Option[VAstConditionalHandler] = None
+  private var declarationHandler: Option[VAstDeclarationHandler] = None
   private var initialConverterState: VAstConverterState = VAstConverterState()
   private val patternConverters: mutable.Map[String, ListBuffer[VAstPatternConverter]] = mutable.Map.empty
 
@@ -34,6 +35,10 @@ class VAstConverter(private val vAstCreator: VAstCreatorNew) {
 
   def addConditionalHandler(conditionalHandler: VAstConditionalHandler): Unit = {
     this.conditionalHandler = Option(conditionalHandler)
+  }
+  
+  def addDeclarationHandler(declarationHandler: VAstDeclarationHandler): Unit = { 
+    this.declarationHandler = Option(declarationHandler)
   }
 
   def convert(superCVAstNode: Node, converterState: VAstConverterState): Seq[Ast] = {
@@ -70,8 +75,13 @@ class VAstConverter(private val vAstCreator: VAstCreatorNew) {
   }
 
   def getConditionalHandler: VAstConditionalHandler = {
-    require(conditionalHandler.isDefined, "No Conditional handler is defined.")
+    require(conditionalHandler.isDefined, "No conditional handler is defined.")
     conditionalHandler.get
+  }
+
+  def getDeclarationHandler: VAstDeclarationHandler = {
+    require(declarationHandler.isDefined, "No declaration handler is defined.")
+    declarationHandler.get
   }
 
   def getInitialConverterState: VAstConverterState = initialConverterState

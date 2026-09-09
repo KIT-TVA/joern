@@ -902,7 +902,7 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
   }
 
   /**
-   * Compares the to given JOERN ASTs node-wise with all node parameters and child nodes.
+   * Compares the two given JOERN ASTs node-wise with all node parameters and child nodes.
    *
    * @param ast1 First AST to compare.
    * @param ast2 Second AST to compare.

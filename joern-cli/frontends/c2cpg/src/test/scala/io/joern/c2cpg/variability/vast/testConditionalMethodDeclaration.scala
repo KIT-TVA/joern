@@ -82,6 +82,20 @@ class testConditionalMethodDeclaration extends C2CpgSuite(withOssDataflow = true
       | #endif
       | ][2]
       | #elif N7
+      | [7]
+      | #if N8
+      | [8]
+      | #else
+      | [
+      | #if N9
+      | 11
+      | #else
+      | 12][13
+      | #endif
+      | ]
+      | #endif
+      | [10]
+      | #elif N10
       | [6][9]
       | #endif
       | ,
@@ -93,6 +107,23 @@ class testConditionalMethodDeclaration extends C2CpgSuite(withOssDataflow = true
       | ) {
       |   size = 8;
       | }
+      |
+      |/**
+      | #if U0
+      | void
+      | #else
+      | int**
+      | #endif
+      | u(int w) {
+      |   int u = 42;
+      | }
+      |
+      | int (*uuu(int www))[4] {
+      |   int uuu = 4242;
+      |   int *w[4];
+      |   return w;
+      | }
+      | **/
       |
       | #if M0
       | void

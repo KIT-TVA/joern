@@ -4,7 +4,7 @@ import io.joern.c2cpg.astcreation.VAstCreatorNew
 import io.joern.c2cpg.astcreation.converter.{VAstConverter, VAstPatternConverter}
 import io.joern.x2cpg.{Ast, AstEdge}
 import io.shiftleft.codepropertygraph.generated.{ControlStructureTypes, nodes}
-import io.shiftleft.codepropertygraph.generated.nodes.{AstNodeNew, NewBlock, NewControlStructure, NewMethod, NewMethodParameterIn, NewMethodReturn, NewNode}
+import io.shiftleft.codepropertygraph.generated.nodes.{AstNodeNew, NewBlock, NewControlStructure, NewMethod, NewMethodParameterIn, NewMethodRef, NewMethodReturn, NewNode}
 import superc.core.PresenceConditionManager.PresenceCondition
 import superc.core.Syntax
 import xtc.tree.{GNode, Location, Node}
@@ -16,6 +16,7 @@ import scala.collection.mutable.ListBuffer
 class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, converter: VAstConverter)
   extends VAstPatternConverter(vAstCreator, converter, List.apply("FunctionDefinition")) {
   private val conditionalHandler: VAstConditionalHandler = converter.getConditionalHandler
+  private val declarationHandler: VAstDeclarationHandler = converter.getDeclarationHandler
 
   private val FUNCTION_DECLARATION: Int = 0
   private val FUNCTION_CODE_INDEX: Int = 1
@@ -24,6 +25,7 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
   private val FUNCTION_RETURN_TYPE_ROOT_NODE_NAME: String = "FunctionPrototype"
   private val FUNCTION_NAME_ROOT_NODE_NAME: String = "FunctionDeclarator"
   private val FUNCTION_PARAMETER_ROOT_NODE_NAME: String = "PostfixingFunctionDeclarator"
+  private val FUNCTION_PARAMETER_LIST_NODE: String = "ParameterList"
   private val SIMPLE_PARAMETER_DECLARATION: String = "SimpleDeclarator"
   private val ARRAY_PARAMETER_DECLARATION: String = "ArrayDeclarator"
   private val ARRAY_DIMENSION_PARAMETER: String = "ArrayAbstractDeclarator"
@@ -100,7 +102,15 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
         returnTypeNodes,
         modifiers = List()
       )
-      Option(Seq(method))
+
+      // Creates the methode declaration refernce node.
+      val methodRefNode: NewMethodRef = vAstCreator.methodRefNodeHelper(superCVAst, methodName, methodName, methodName)
+        .lineNumber(methodLine)
+        .columnNumber(methodColumn)
+      val methodRefAst: Ast = vAstCreator.AstHelper(methodRefNode)
+
+      // Returns the method declaration and the method ref node as two ASTs.
+      Option(Seq(method, methodRefAst))
     }
   }
 
@@ -212,33 +222,14 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
             if (location == null) (None, None) else (Option(location.line), Option(location.column))
 
           // Creates each JOERN method parameter node.
-          val creator: (Node, VAstConverterState) => Seq[Ast] = (parameterNameNode: Node, s: VAstConverterState) => {
-            // TODO: Muss hier noch die Array und Pointer Varianten behandeln.
-            val (fullParameterType: String, parameterName: String, code: String) = parameterNameNode.getName match {
-              case nodeName if nodeName.equals(POINTER_PARAMETER_DECLARATION) =>
-                var pointerInformation: String = "*"
-                var nextPointerNode: Node = parameterNameNode.getNode(1)
-                while (nextPointerNode.getName.equals(POINTER_PARAMETER_DECLARATION)) {
-                  pointerInformation += "*"
-                  nextPointerNode = nextPointerNode.getNode(1)
-                }
-                val (arrayDimensions: String, variableName: String) = extractVariableInformation(nextPointerNode)
-                (s"$parameterType$arrayDimensions$pointerInformation", variableName,
-                  s"$parameterType$pointerInformation $variableName$arrayDimensions")
-              case _ =>
-                val (arrayDimensions: String, variableName: String) = extractVariableInformation(parameterNameNode)
-                (s"$parameterType$arrayDimensions", variableName, s"$parameterType $variableName$arrayDimensions")
-            }
-
-            // The parameter index for each parameter Nod is set after all parameter nodes are translated and  in the
-            // right order because in some conditional situations the parameters in the SuperC AST may not in order.
-            val parameterNode: NewMethodParameterIn = vAstCreator.parameterInNodeHelper(node, parameterName, code,
-              -1, false, "BY_VALUE", fullParameterType, dynamicTypeHintFullName = Seq(), line = line, column = column)
-            Seq(vAstCreator.AstHelper(parameterNode))
-          }
-          if (conditionalHandler.isConditionalNode(parameterNameRootNode)) {
-            conditionalHandler.handelAndSimplifyConditional(parameterNameRootNode, state, creator)
-          } else creator(parameterNameRootNode, state)
+          declarationHandler.handleDeclaration(parameterNameRootNode, parameterType, state,
+            (nameNode: Node, s: VAstConverterState, fullParameterType: String, parameterName: String, code: String) => {
+              // The parameter index for each parameter Nod is set after all parameter nodes are translated and in the
+              // right order because in some conditional situations the parameters in the SuperC AST may not in order.
+              val parameterNode: NewMethodParameterIn = vAstCreator.parameterInNodeHelper(node, parameterName, code,
+                -1, false, "BY_VALUE", fullParameterType, dynamicTypeHintFullName = Seq(), line = line, column = column)
+              Seq(vAstCreator.AstHelper(parameterNode))
+            })
         }
 
         val parameterTypeRootNode: Node = node.getNode(0)
@@ -247,15 +238,34 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
         } else methodParameterCreator(parameterTypeRootNode, extractorState)
       }
 
+      // Extracts all method parameter.
       val parameterListNode: Node = parameterTypeListNode.getNode(0).getNode(0) // root node of all parameters (including the conditional ones)
       val numberOfParameters: Int = parameterListNode.size
-      for (parameterNodeIndex: Int <- 0 until numberOfParameters) {
+      for (parameterNodeIndex: Int <- 0 until numberOfParameters) { // Iterates over all parameters (parameter nodes).
         val parameterNode: Node = parameterListNode.get(parameterNodeIndex).asInstanceOf[Node]
 
         // Extracts one method parameter.
-        val newParameterNodes: Seq[Ast] = if (conditionalHandler.isConditionalNode(parameterNode)) {
-          conditionalHandler.handelAndSimplifyConditional(parameterNode, converterState, methodParameterExtractor)
-        } else methodParameterExtractor(parameterNode, converterState)
+        val newParameterNodes: Seq[Ast] = conditionalHandler.handleAndSimplifyConditionalExtended(parameterNode, converterState,
+          (conditionalParameterNode: Node, parameterState: VAstConverterState) => {
+            if (conditionalParameterNode.getName.equals(FUNCTION_PARAMETER_LIST_NODE)) {
+              // If the SuperC node is a conditional "ParameterList" node (a second "ParameterList" node).
+              var conditionalParameterAsts: Seq[Ast] = Seq.empty[Ast]
+              val numberOfConditionalParameters: Int = conditionalParameterNode.size
+              if (numberOfConditionalParameters > 0) {
+                for (conditionalParameterIndex: Int <- 0 until numberOfConditionalParameters) { // Iterates over a conditional subset parameters (parameter nodes) that share at least on condition.
+                  val currentNode: Node = conditionalParameterNode.getNode(conditionalParameterIndex)
+                  conditionalParameterAsts = conditionalParameterAsts
+                    ++ conditionalHandler.handleAndSimplifyConditionalExtended(currentNode, parameterState,
+                                                                               methodParameterExtractor)
+                }
+              }
+              conditionalParameterAsts
+
+            } else {
+              // If the SuperC node is a "ParameterIdentifierDeclaration" node.
+              methodParameterExtractor(conditionalParameterNode, parameterState)
+            }
+          })
         parameterNodes = parameterNodes ++ newParameterNodes
       }
     }
