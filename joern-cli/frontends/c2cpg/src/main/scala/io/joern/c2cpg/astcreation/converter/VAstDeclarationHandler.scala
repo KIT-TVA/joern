@@ -7,7 +7,9 @@ import xtc.tree.{Location, Node}
 /**
  * This is a helper class to simplify the handling of parameters and variable declarations.
  */
-class VAstDeclarationHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter) {
+class VAstDeclarationHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
+  extends VAstHandler(vAstCreator, converter) {
+  
   private val conditionalHandler: VAstConditionalHandler = converter.getConditionalHandler
 
   private val SIMPLE_PARAMETER_DECLARATION: String = "SimpleDeclarator"
@@ -140,14 +142,14 @@ class VAstDeclarationHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
         case _ => "[]"
       }) + variableArrayInformation
       if (nextArrayNode.size > 0 && (nextArrayNode.getNode(0).getName.equals(ARRAY_DIMENSION_PARAMETER)
-        || conditionalHandler.isConditionalNode(nextArrayNode.getNode(0)))) {
+        || conditionalHandler.isSuperCConditionalNode(nextArrayNode.getNode(0)))) {
         nextArrayNode = nextArrayNode.getNode(0)
-        isArrayNode = !conditionalHandler.isConditionalNode(nextArrayNode)
+        isArrayNode = !conditionalHandler.isSuperCConditionalNode(nextArrayNode)
       } else isArrayNode = false
     }
 
-    if (conditionalHandler.isConditionalNode(nextArrayNode)) {
-      conditionalHandler.handelAndSimplifyConditional(nextArrayNode, converterState, (arrayNode: Node, state: VAstConverterState) => {
+    if (conditionalHandler.isSuperCConditionalNode(nextArrayNode)) {
+      conditionalHandler.handleAndSimplifyConditional(nextArrayNode, converterState, (arrayNode: Node, state: VAstConverterState) => {
         handleArrayDimensions(arrayNode, state, parameterCreator, nameNode, parameterType, pointerInformation,
                               parameterName, variableArrayInformation, line, column)
       })

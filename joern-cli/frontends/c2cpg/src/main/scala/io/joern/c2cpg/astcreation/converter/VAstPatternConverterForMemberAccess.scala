@@ -59,11 +59,11 @@ class VAstPatternConverterForMemberAccess(vAstCreator: VAstCreatorNew, converter
 
   private def operandAst(node: Node, converterState: VAstConverterState): Ast = {
     val conditionalHandler = converter.getConditionalHandler
-    if (conditionalHandler.isConditionalNode(node)) {
-      if (conditionalHandler.getFirstCondition(node) == "1") {
-        operandAst(conditionalHandler.getFirstConditionalSubtree(node), converterState)
+    if (conditionalHandler.isSuperCConditionalNode(node)) {
+      if (conditionalHandler.getFirstSuperCCondition(node) == "1") {
+        operandAst(conditionalHandler.getFirstSuperCConditionalSubtree(node), converterState)
       } else {
-        val asts = conditionalHandler.handelConditional(
+        val asts = conditionalHandler.handleConditional(
           node,
           converterState,
           (child, state) => Seq(operandAst(child, state))

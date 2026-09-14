@@ -24,15 +24,15 @@ class VAstPatternConverterForVariableDeclaration(vAstCreator: VAstCreatorNew, co
 
   private val FIRST_DECLARATION_NODE_NODE_SIZE: Int = 5
 
-  override def getInitialState: Any = Seq.empty[(Node, Node)]
+  override def getInitialConverterState: Any = Seq.empty[(Node, Node)]
 
   override def convert(superCVAst: Node, converterState: VAstConverterState): Option[Seq[Ast]] = {
     val astSubtree: Seq[Ast] = superCVAst.getName match {
       case "Declaration" =>
         val declarationNode: Node = superCVAst.getNode(PREVIOUS_VARIABLE_DECLARATION)
         val conditionalHandler: VAstConditionalHandler = converter.getConditionalHandler
-        if (conditionalHandler.isConditionalNode(declarationNode)) {
-          conditionalHandler.handelAndSimplifyConditional(declarationNode, converterState,
+        if (conditionalHandler.isSuperCConditionalNode(declarationNode)) {
+          conditionalHandler.handleAndSimplifyConditional(declarationNode, converterState,
             (node: Node, state: VAstConverterState) => converter.convert(node, state))
         } else {
           converter.convert(declarationNode, converterState)
@@ -65,19 +65,19 @@ class VAstPatternConverterForVariableDeclaration(vAstCreator: VAstCreatorNew, co
     val allDeclarations: Seq[(Node, Node)] = previousDeclarations ++ newDeclarations.toSeq
 
     val conditionalHandler: VAstConditionalHandler = converter.getConditionalHandler
-    if (conditionalHandler.isConditionalNode(currentDeclarationNode)) {
+    if (conditionalHandler.isSuperCConditionalNode(currentDeclarationNode)) {
       // If the next node is a conditional.
       // Prepares and performances the conditional handling.
       val newConverterState: VAstConverterState = converterState.updateState(this, allDeclarations)
-      conditionalHandler.handelAndSimplifyConditional(currentDeclarationNode, newConverterState, createDeclarations)
+      conditionalHandler.handleAndSimplifyConditional(currentDeclarationNode, newConverterState, createDeclarations)
 
     } else {
       // If the variable types node is reached.
       // Defines all declarations and initializations.
       val variableType: String = currentDeclarationNode.getString(0)
       allDeclarations.flatMap((variableNameNode: Node, initialisationNode) => {
-        if (conditionalHandler.isConditionalNode(variableNameNode)) {
-          conditionalHandler.handelAndSimplifyConditional(variableNameNode, converterState,
+        if (conditionalHandler.isSuperCConditionalNode(variableNameNode)) {
+          conditionalHandler.handleAndSimplifyConditional(variableNameNode, converterState,
             (variableNode, state) => createVariableDeclaration(variableType, variableNode, initialisationNode, state))
         } else {
           createVariableDeclaration(variableType, variableNameNode, initialisationNode, converterState)

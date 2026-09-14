@@ -81,7 +81,7 @@ class VAstPatternConverterForSuperCRoot(vAstCreator: VAstCreatorNew, converter: 
   }
 
   private def isConditionalMethod(rootNode: NewNode, ast: Ast): Boolean = {
-    if (!converter.getConditionalHandler.isChoiceNode(rootNode)) {
+    if (!converter.getConditionalHandler.isJoernChoiceNode(rootNode)) {
       false
     } else {
       val childNodes: Seq[NewNode] = ast.edges

@@ -12,6 +12,7 @@ class VAstConverter(private val vAstCreator: VAstCreatorNew) {
 
   private var conditionalHandler: Option[VAstConditionalHandler] = None
   private var declarationHandler: Option[VAstDeclarationHandler] = None
+  private var logicHandler: Option[VAstLogicHandler] = None
   private var initialConverterState: VAstConverterState = VAstConverterState()
   private val patternConverters: mutable.Map[String, ListBuffer[VAstPatternConverter]] = mutable.Map.empty
 
@@ -34,11 +35,21 @@ class VAstConverter(private val vAstCreator: VAstCreatorNew) {
   }
 
   def addConditionalHandler(conditionalHandler: VAstConditionalHandler): Unit = {
+    val initialState = conditionalHandler.getInitialConverterState
+    initialConverterState = initialConverterState.updateState(conditionalHandler, initialState)
     this.conditionalHandler = Option(conditionalHandler)
   }
   
-  def addDeclarationHandler(declarationHandler: VAstDeclarationHandler): Unit = { 
+  def addDeclarationHandler(declarationHandler: VAstDeclarationHandler): Unit = {
+    val initialState = declarationHandler.getInitialConverterState
+    initialConverterState = initialConverterState.updateState(declarationHandler, initialState)
     this.declarationHandler = Option(declarationHandler)
+  }
+  
+  def addLogicHandler(logicHandler: VAstLogicHandler): Unit = {
+    val initialState = logicHandler.getInitialConverterState
+    initialConverterState = initialConverterState.updateState(logicHandler, initialState)
+    this.logicHandler = Option(logicHandler)
   }
 
   def convert(superCVAstNode: Node, converterState: VAstConverterState): Seq[Ast] = {
@@ -82,6 +93,11 @@ class VAstConverter(private val vAstCreator: VAstCreatorNew) {
   def getDeclarationHandler: VAstDeclarationHandler = {
     require(declarationHandler.isDefined, "No declaration handler is defined.")
     declarationHandler.get
+  }
+
+  def getLogicHandler: VAstLogicHandler = {
+    require(logicHandler.isDefined, "No logic handler is defined.")
+    logicHandler.get
   }
 
   def getInitialConverterState: VAstConverterState = initialConverterState

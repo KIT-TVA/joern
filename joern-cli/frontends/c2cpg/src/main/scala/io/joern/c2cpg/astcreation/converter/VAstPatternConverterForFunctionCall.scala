@@ -29,7 +29,7 @@ class VAstPatternConverterForFunctionCall(vAstCreator: VAstCreatorNew, converter
         val nameNode = callNode.getNode(0)
         val argsNode = callNode.getNode(1)
         val conditionalHandler = converter.getConditionalHandler
-        if (conditionalHandler.isConditionalNode(nameNode)) {
+        if (conditionalHandler.isSuperCConditionalNode(nameNode)) {
           val restructuredCall: Node = conditionalHandler.createConditionalSuperCSubtree(
             nameNode,
             converterState,
@@ -112,11 +112,11 @@ class VAstPatternConverterForFunctionCall(vAstCreator: VAstCreatorNew, converter
 
   private def argumentConverter(node: Node, converterState: VAstConverterState): Ast = {
     val conditionalHandler = converter.getConditionalHandler
-    if (conditionalHandler.isConditionalNode(node)) {
-      if (conditionalHandler.getFirstCondition(node) == "1") {
-        argumentConverter(conditionalHandler.getFirstConditionalSubtree(node), converterState)
+    if (conditionalHandler.isSuperCConditionalNode(node)) {
+      if (conditionalHandler.getFirstSuperCCondition(node) == "1") {
+        argumentConverter(conditionalHandler.getFirstSuperCConditionalSubtree(node), converterState)
       } else {
-        val asts = conditionalHandler.handelConditional(
+        val asts = conditionalHandler.handleConditional(
           node,
           converterState,
           (child, state) => Seq(argumentConverter(child, state))

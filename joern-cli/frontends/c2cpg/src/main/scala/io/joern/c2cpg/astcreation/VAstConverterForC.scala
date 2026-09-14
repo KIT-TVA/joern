@@ -1,15 +1,16 @@
 package io.joern.c2cpg.astcreation
 
-import io.joern.c2cpg.astcreation.converter.{VASTPatternConverterForEmptyDefinition, VAstConverter, VAstDeclarationHandler, VAstPatternConverter, VAstPatternConverterForBinaryOperators, VAstPatternConverterForCast, VAstPatternConverterForConditionalMacro, VAstPatternConverterForFunctionCall, VAstPatternConverterForFunctionDeclaration, VAstPatternConverterForMemberAccess, VAstPatternConverterForParenthesizedExpression, VAstPatternConverterForReturn, VAstPatternConverterForSuperCRoot, VAstPatternConverterForUnaryOperators, VAstPatternConverterForVariableDeclaration, VAstPatternConverterForWhileLoop}
+import io.joern.c2cpg.astcreation.converter.{VASTPatternConverterForEmptyDefinition, VAstConditionalHandler, VAstConverter, VAstDeclarationHandler, VAstLogicHandler, VAstPatternConverter, VAstPatternConverterForBinaryOperators, VAstPatternConverterForCast, VAstPatternConverterForConditionalMacro, VAstPatternConverterForFunctionCall, VAstPatternConverterForFunctionDeclaration, VAstPatternConverterForMemberAccess, VAstPatternConverterForParenthesizedExpression, VAstPatternConverterForReturn, VAstPatternConverterForSuperCRoot, VAstPatternConverterForUnaryOperators, VAstPatternConverterForVariableDeclaration, VAstPatternConverterForWhileLoop}
 
 class VAstConverterForC(private var vAstCreator: VAstCreatorNew) extends VAstConverter(vAstCreator) {
-  private val conditionalConverter = new VAstPatternConverterForConditionalMacro(vAstCreator, this)
-  super.addConditionalHandler(conditionalConverter)
+  super.addLogicHandler(new VAstLogicHandler(vAstCreator, this))
+  super.addConditionalHandler(new VAstConditionalHandler(vAstCreator, this))
   super.addDeclarationHandler(new VAstDeclarationHandler(vAstCreator, this))
+
   private val patterns: List[VAstPatternConverter] = List.apply(
     new VAstPatternConverterForBinaryOperators(vAstCreator, this),
     new VAstPatternConverterForCast(vAstCreator, this),
-    conditionalConverter,
+    new VAstPatternConverterForConditionalMacro(vAstCreator, this),
     new VAstPatternConverterForFunctionCall(vAstCreator, this),
     new VAstPatternConverterForMemberAccess(vAstCreator, this),
     new VAstPatternConverterForParenthesizedExpression(vAstCreator, this),

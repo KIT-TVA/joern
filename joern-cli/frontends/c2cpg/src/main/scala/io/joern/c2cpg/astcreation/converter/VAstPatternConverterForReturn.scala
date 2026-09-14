@@ -55,8 +55,8 @@ class VAstPatternConverterForReturn(vAstCreator: VAstCreatorNew, converter: VAst
         case "ExpressionOpt" => vAstCreator.AstHelper()
         case "PrimaryIdentifier" => variableAst(returnContentNode)
         case name if name.startsWith("superc.core.Syntax$") => constantAst(returnContentNode)
-        case name if conditionalHandler.isConditionalNode(returnContentNode) =>
-          conditionalHandler.handelConditional(returnContentNode, converterState,(node: Node, state: VAstConverterState) => {
+        case name if conditionalHandler.isSuperCConditionalNode(returnContentNode) =>
+          conditionalHandler.handleConditional(returnContentNode, converterState, (node: Node, state: VAstConverterState) => {
             Seq(getReturnContentAst(node, state))
           }).head
 

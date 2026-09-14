@@ -48,7 +48,7 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
     val methodParameterListRootNode: Node = functionPropertyRootNode.getNode(1).getNode(1)
 
     // Checks if the methode name is Conditional.
-    if (conditionalHandler.isConditionalNode(methodNameRootNode)) {
+    if (conditionalHandler.isSuperCConditionalNode(methodNameRootNode)) {
       // Translates the method declarations if the method name is conditional.
       // Transforms the SuperC method declaration VAST with conditional method name into a SuperC VAST with conditional
       // method declarations but unconditional method names.
@@ -60,7 +60,7 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
       })
 
       // Transforms the modified SuperC VAST into as JOERN VAST.
-      Option(conditionalHandler.handelAndSimplifyConditional(newSubVAst, converterState,
+      Option(conditionalHandler.handleAndSimplifyConditional(newSubVAst, converterState,
         (node: Node, state: VAstConverterState) => converter.convert(node, state)))
 
     } else {
@@ -155,8 +155,8 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
     }
 
     // Converts all method return type node.
-    val returnTypeNodes: Seq[Ast] = if (conditionalHandler.isConditionalNode(returnTypeRootNode)) {
-      val returnNodes: Seq[Ast] = conditionalHandler.handelAndSimplifyConditional(returnTypeRootNode, converterState,
+    val returnTypeNodes: Seq[Ast] = if (conditionalHandler.isSuperCConditionalNode(returnTypeRootNode)) {
+      val returnNodes: Seq[Ast] = conditionalHandler.handleAndSimplifyConditional(returnTypeRootNode, converterState,
         createReturnTypeNodes)
       val typesList: String = returnNodes.map((returnAst: Ast) => {
         returnAst.root.get match {
@@ -233,8 +233,8 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
         }
 
         val parameterTypeRootNode: Node = node.getNode(0)
-        if (conditionalHandler.isConditionalNode(parameterTypeRootNode)) {
-          conditionalHandler.handelAndSimplifyConditional(parameterTypeRootNode, extractorState, methodParameterCreator)
+        if (conditionalHandler.isSuperCConditionalNode(parameterTypeRootNode)) {
+          conditionalHandler.handleAndSimplifyConditional(parameterTypeRootNode, extractorState, methodParameterCreator)
         } else methodParameterCreator(parameterTypeRootNode, extractorState)
       }
 
@@ -273,7 +273,7 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
     // Sorts the parameters by is position in the method signature.
     parameterNodes = parameterNodes.sortBy((parameterAst: Ast) => {
       var rootNode: NewNode = parameterAst.root.get
-      if (conditionalHandler.isChoiceNode(rootNode)) {
+      if (conditionalHandler.isJoernChoiceNode(rootNode)) {
         rootNode = parameterAst.edges.filter((edge: AstEdge) => edge.src == rootNode).head.dst
       }
       val parameterNode: AstNodeNew = rootNode.asInstanceOf[AstNodeNew]
@@ -282,7 +282,7 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
       (line, column)
     }).zipWithIndex.map((parameterAst: Ast, parameterIndex: Int) => {
       var rootNode: NewNode = parameterAst.root.get
-      if (conditionalHandler.isChoiceNode(rootNode)) {
+      if (conditionalHandler.isJoernChoiceNode(rootNode)) {
         rootNode = parameterAst.edges.filter((edge: AstEdge) => edge.src == rootNode).head.dst
       }
       rootNode.asInstanceOf[NewMethodParameterIn].index(parameterIndex + 1)
@@ -304,7 +304,7 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
 
         case conditionalNode: NewControlStructure =>
           // If the parameter is conditional.
-          val parameterCondition: String = conditionalHandler.getFirstPresenceConditions(conditionalNode)
+          val parameterCondition: String = conditionalHandler.getFirstJoernPresenceConditions(conditionalNode)
           val parameterNode: NewMethodParameterIn = parameter.edges
             .filter((edge: AstEdge) => edge.src.equals(conditionalNode)).head.dst.asInstanceOf[NewMethodParameterIn]
           val newParamType: Seq[String] = Seq(parameterNode.typeFullName)
@@ -423,8 +423,8 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
 
     // Translates the method instructions of the current method.
     val conditionalHandler: VAstConditionalHandler = converter.getConditionalHandler
-    val instructionAsts: Seq[Ast] = if (conditionalHandler.isConditionalNode(instructionSuperCRootNode)) {
-      conditionalHandler.handelAndSimplifyConditional(instructionSuperCRootNode, converterState, extractMethodeInstructions)
+    val instructionAsts: Seq[Ast] = if (conditionalHandler.isSuperCConditionalNode(instructionSuperCRootNode)) {
+      conditionalHandler.handleAndSimplifyConditional(instructionSuperCRootNode, converterState, extractMethodeInstructions)
     } else extractMethodeInstructions(instructionSuperCRootNode, converterState)
 
     // Ensures, that all instructions are combined into one AST with a code block node as root node.
@@ -515,7 +515,7 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
       val astRootNode: Option[NewNode] = methodeInstructionAsts.head.root
       astRootNode.isEmpty
         || !((astRootNode.get.nodeKind == JOERN_BLOCK_NODE_KIND) && astRootNode.get.label.equals(JOERN_BLOCK_NODE_LABEL))
-        || !converter.getConditionalHandler.isChoiceNode(astRootNode.get)
+        || !converter.getConditionalHandler.isJoernChoiceNode(astRootNode.get)
     }
   }
 }
