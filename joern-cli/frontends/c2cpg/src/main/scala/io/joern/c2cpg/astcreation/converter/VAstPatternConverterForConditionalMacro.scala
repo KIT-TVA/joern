@@ -237,7 +237,8 @@ class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, conve
     }
 
     // Extracts conditions and subtrees.
-    val (firstCondition: String, firstConditionalSubtree: Node, secondCondition: String, secondConditionalSubtree: Node) =
+    // Note: secondConditionalSubtree may be null for SIMPLE (size-2) Conditional — do not annotate as Node.
+    val (firstCondition: String, firstConditionalSubtree: Node, secondCondition: String, secondConditionalSubtree) =
       extractConditionsAndSubtrees(conditionalNode)
 
     // Converts the SuperC subtrees.

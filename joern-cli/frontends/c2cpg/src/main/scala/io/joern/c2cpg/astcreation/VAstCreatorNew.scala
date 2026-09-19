@@ -4,9 +4,9 @@ import io.joern.c2cpg.astcreation.converter.{VAstConverter, VAstConverterState}
 import io.joern.x2cpg.datastructures.VariableScopeManager
 import io.joern.x2cpg.{Ast, AstCreatorBase, AstNodeBuilder, Defines, ValidationMode}
 import io.shiftleft.codepropertygraph.generated.{Cpg, DiffGraphBuilder, PropertyDefaults}
-import io.shiftleft.codepropertygraph.generated.nodes.{NewBlock, NewCall, NewControlStructure, NewFile, NewLocal, NewMethod, NewMethodReturn, NewModifier, NewNode, NewReturn, NewTypeRef}
+import io.shiftleft.codepropertygraph.generated.nodes.{NewBlock, NewCall, NewControlStructure, NewFile, NewJumpTarget, NewLocal, NewMember, NewMethod, NewMethodReturn, NewModifier, NewNode, NewReturn, NewTypeDecl, NewTypeRef}
 import org.slf4j.{Logger, LoggerFactory}
-import xtc.tree.Node
+import xtc.tree.{Location, Node}
 
 class VAstCreatorNew(
                       val filename: String,
@@ -37,29 +37,22 @@ class VAstCreatorNew(
     filename
   }
 
-  override protected def line(node: Node): Option[Int] = {
-    print(s"requested line for ${node.getName}")
-    Option(42)
+  /** Prefer SuperC Location; avoid the old placeholder line/column = 42. */
+  private def locationOf(node: Node): (Option[Int], Option[Int]) = {
+    val loc: Location = node.getLocation
+    if (loc == null) (None, None) else (Option(loc.line), Option(loc.column))
   }
 
-  override protected def column(node: Node): Option[Int] = {
-    print(s"requested column for ${node.getName}")
-    Option(42)
-  }
+  override protected def line(node: Node): Option[Int] = locationOf(node)._1
 
-  override protected def lineEnd(node: Node): Option[Int] = {
-    print(s"requestet lineEnd for ${node.getName}")
-    Option(42)
-  }
+  override protected def column(node: Node): Option[Int] = locationOf(node)._2
 
-  override protected def columnEnd(element: Node): Option[Int] = {
-    print(s"requested columnEnd for ${element.getName}")
-    Option(42)
-  }
+  override protected def lineEnd(node: Node): Option[Int] = locationOf(node)._1
+
+  override protected def columnEnd(element: Node): Option[Int] = locationOf(element)._2
 
   override protected def code(node: Node): String = {
-    print(s"requested code for ${node.getName}")
-    "42code42"
+    Option(node).map(_.getName).filter(_.nonEmpty).getOrElse("")
   }
 
   def AstHelper(): Ast = Ast()
@@ -154,6 +147,56 @@ class VAstCreatorNew(
   def controlStructureNodeHelper(node: Node, controlStructureType: String, code: String,
                                  line: Option[Int] = None, column: Option[Int] = None): NewControlStructure = {
     controlStructureNodeCreator(node, controlStructureType, code, line, column)
+  }
+
+  def jumpTargetNodeHelper(
+                            node: Node,
+                            name: String,
+                            code: String,
+                            line: Option[Int] = None,
+                            column: Option[Int] = None
+                          ): NewJumpTarget = {
+    NewJumpTarget()
+      .parserTypeName(node.getClass.getSimpleName)
+      .name(name)
+      .code(code)
+      .lineNumber(line)
+      .columnNumber(column)
+  }
+
+  def typeDeclNodeHelper(
+                          node: Node,
+                          name: String,
+                          fullName: String,
+                          filename: String,
+                          code: String,
+                          line: Option[Int] = None,
+                          column: Option[Int] = None
+                        ): NewTypeDecl = {
+    NewTypeDecl()
+      .name(name)
+      .fullName(fullName)
+      .code(code)
+      .isExternal(false)
+      .filename(filename)
+      .lineNumber(line)
+      .columnNumber(column)
+  }
+
+  def memberNodeHelper(
+                        node: Node,
+                        name: String,
+                        code: String,
+                        typeFullName: String,
+                        line: Option[Int] = None,
+                        column: Option[Int] = None
+                      ): NewMember = {
+    NewMember()
+      .name(name)
+      .code(code)
+      .typeFullName(typeFullName)
+      .lineNumber(line)
+      .columnNumber(column)
   }
 
   def typeRefNodeHelper(node: Node, code: String, typeFullName: String): NewTypeRef =

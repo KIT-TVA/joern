@@ -1,6 +1,6 @@
 package io.joern.c2cpg.astcreation
 
-import io.joern.c2cpg.astcreation.converter.{VASTPatternConverterForEmptyDefinition, VAstConverter, VAstPatternConverter, VAstPatternConverterForBinaryOperators, VAstPatternConverterForBreakContinue, VAstPatternConverterForCast, VAstPatternConverterForConditionalMacro, VAstPatternConverterForForLoop, VAstPatternConverterForFunctionCall, VAstPatternConverterForFunctionDeclaration, VAstPatternConverterForIf, VAstPatternConverterForMemberAccess, VAstPatternConverterForParenthesizedExpression, VAstPatternConverterForSuperCRoot, VAstPatternConverterForUnaryOperators, VAstPatternConverterForVariableDeclaration, VAstPatternConverterForWhileLoop}
+import io.joern.c2cpg.astcreation.converter.{VASTPatternConverterForEmptyDefinition, VAstConverter, VAstPatternConverter, VAstPatternConverterForBinaryOperators, VAstPatternConverterForBreakContinue, VAstPatternConverterForCast, VAstPatternConverterForConditionalMacro, VAstPatternConverterForEnum, VAstPatternConverterForForLoop, VAstPatternConverterForFunctionCall, VAstPatternConverterForFunctionDeclaration, VAstPatternConverterForGoto, VAstPatternConverterForIf, VAstPatternConverterForMemberAccess, VAstPatternConverterForParenthesizedExpression, VAstPatternConverterForSuperCRoot, VAstPatternConverterForSwitch, VAstPatternConverterForUnaryOperators, VAstPatternConverterForVariableDeclaration, VAstPatternConverterForWhileLoop}
 
 class VAstConverterForC(private var vAstCreator: VAstCreatorNew) extends VAstConverter(vAstCreator) {
   private val conditionalConverter = new VAstPatternConverterForConditionalMacro(vAstCreator, this)
@@ -9,7 +9,9 @@ class VAstConverterForC(private var vAstCreator: VAstCreatorNew) extends VAstCon
     new VAstPatternConverterForBreakContinue(vAstCreator, this),
     new VAstPatternConverterForCast(vAstCreator, this),
     conditionalConverter,
+    new VAstPatternConverterForEnum(vAstCreator, this),
     new VAstPatternConverterForFunctionCall(vAstCreator, this),
+    new VAstPatternConverterForGoto(vAstCreator, this),
     new VAstPatternConverterForMemberAccess(vAstCreator, this),
     new VAstPatternConverterForParenthesizedExpression(vAstCreator, this),
     new VAstPatternConverterForUnaryOperators(vAstCreator, this),
@@ -19,6 +21,8 @@ class VAstConverterForC(private var vAstCreator: VAstCreatorNew) extends VAstCon
     // For before While: both register IterationStatement; first matching converter wins.
     new VAstPatternConverterForForLoop(vAstCreator, this),
     new VAstPatternConverterForIf(vAstCreator, this),
+    // Switch after If: both register SelectionStatement; If returns None for "switch".
+    new VAstPatternConverterForSwitch(vAstCreator, this),
     new VAstPatternConverterForWhileLoop(vAstCreator, this),
     new VASTPatternConverterForEmptyDefinition(vAstCreator, this)
   )
