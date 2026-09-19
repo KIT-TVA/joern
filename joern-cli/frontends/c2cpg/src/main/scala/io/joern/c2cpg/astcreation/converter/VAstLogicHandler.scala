@@ -29,22 +29,6 @@ class VAstLogicHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
       val normalizedExpression: Seq[Seq[String]] = expression.flatMap(normalizeAndExpression)
       normalizedExpression.nonEmpty
   }
-  
-  // TODO: The method can be deleted.
-  private def combineAndSimplyConditions(conditions: Seq[String]): String = {
-    conditions.size match {
-      case 0 => "1"
-      case 1 => conditions.head
-      case _ =>
-        var combinedConditions: String = conditions.head
-        for (condition <- conditions.tail) {
-          combinedConditions = combineAndSimplyTwoConditions(combinedConditions, condition, condition == conditions.last)
-        }
-        val finalC: String = combinedConditions.split(" \\|\\| ").distinct.mkString(" || ")
-        val initial: String = conditions.mkString(") && (")
-        finalC
-    }
-  }
 
   def combineAndSimplyConditionsAnd(conditions: Seq[String]): String = {
     conditions.size match {
@@ -85,28 +69,6 @@ class VAstLogicHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
     }
   }
   
-  // TODO: The method can be deleted.
-  private def combineAndSimplyTwoConditions(firstConditions: String, secondCondition: String,
-                                            fullSimplification: Boolean = false): String = {
-    // Combines the two conditions in disjunctive form.
-    val firstConditionsParts: Seq[String] = firstConditions.split(" \\|\\| ")
-    val secondConditionParts: Seq[String] = secondCondition.split(" \\|\\| ")
-    val combinedTerm: Seq[Seq[String]] = firstConditionsParts.flatMap((firstPart: String) => {
-      val firstPartSubParts: Seq[String] = firstPart.split(" && ")
-      secondConditionParts.map((secondPart: String) => {
-        (firstPartSubParts ++ secondPart.split(" && ")).distinct.sorted
-      })
-    })
-
-    // Simplifies the created new expression.
-    var simplifiedCombinedTerm: Seq[Seq[String]] = simplify(combinedTerm)
-    if (fullSimplification) {
-      simplifiedCombinedTerm = getPrimeImplicants(simplifiedCombinedTerm)
-    }
-
-    simplifiedCombinedTerm.map((innerPart: Seq[String]) => innerPart.mkString(" && ")).mkString(" || ")
-  }
-  
   private def stringToExpression(condition: String) : Seq[Seq[String]] = {
     if (isTrue(condition)) Seq(Seq("1")) else {
       condition.split(" \\|\\| ").map((andTerm: String) => {
@@ -143,30 +105,6 @@ class VAstLogicHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
         // the passed expression itself is not a tautology.
         getPrimeImplicants(exp)
     }
-    
-    /**
-    var terms: Set[Set[String]] = normalizedExpression.map((andExp: Seq[String]) => andExp.toSet).toSet
-    var changed = true
-    while (changed) {
-      val before = terms
-
-      // Remove terms that are covered by shorter terms.
-      terms = removeAbsorbedTerms(terms)
-
-      // Combine terms, e.g.: (a && b) || (a && !b)  =>  (a)
-      val combinedTerms = for {
-        a <- terms
-        b <- terms
-        combined <- combine(a, b)
-      } yield combined
-
-      // (a && b) || (a) => (a)
-      terms = removeAbsorbedTerms(terms ++ combinedTerms)
-      changed = terms != before
-    }
-
-    terms.toList.sortBy(term => (term.size, term.toList.sorted.mkString(","))).map(_.toList.sorted)
-    **/
   }
 
   /**
@@ -190,32 +128,6 @@ class VAstLogicHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
       val normalizedLiterals: Seq[String] = literals.filterNot((literal: String) => isTrue(literal))
       if (normalizedLiterals.isEmpty) Some(Seq("1")) else Some(normalizedLiterals)
     }
-  }
-
-  /**
-   * Removes all and-expression that are covered by other and-expressions and returns the updated set of and.expressions.
-   * 
-   * TODO: The method can be deleted.
-   * 
-   * @param expression The set of and-expressions to be simplified.
-   * @return Returns the updated set of and.expressions.
-   */
-  private def removeAbsorbedTerms(expression: Set[Set[String]]): Set[Set[String]] = {
-    expression.filterNot((andExpression: Set[String]) => expression.exists((otherAndExpression: Set[String]) => {
-      (otherAndExpression != andExpression) && otherAndExpression.subsetOf(andExpression)
-    }))
-  }
-
-  private def combine(a: Set[String], b: Set[String]): Option[Set[String]] = {
-    val onlyA = a -- b
-    val onlyB = b -- a
-
-    if (onlyA.size == 1 && onlyB.size == 1) {
-      val litA = onlyA.head
-      val litB = onlyB.head
-
-      if (negate(litA) == litB) Some(a intersect b) else None
-    } else None
   }
 
   private def negate(literal: String): String = if (literal.startsWith("!")) literal.drop(1) else "!" + literal

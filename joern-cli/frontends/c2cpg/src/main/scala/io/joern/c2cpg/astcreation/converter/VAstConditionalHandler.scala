@@ -154,18 +154,6 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
           // If the conditional node contains two satisfiable subtrees/conditions.
           secondConditionalSubAsts = conditionalHandler(secondCondition, secondConditionalSubtree, converterState)
           secondConditionalSubAst = combineAsts(secondConditionalSubtree, secondConditionalSubAsts)
-
-          /**
-           * // TODO: This is no longer necessary, since `extractConditionsAndSubtrees(...)` now returns only conditions that arw satisfied.
-           * // Standardizes the AST subtree representation.
-           * if (firstConditionalSubAst.root.isEmpty) {
-           * // If the first condition contains an empty AST.
-           * firstConditionalSubAst = secondConditionalSubAst
-           * secondConditionalSubAst = vAstCreator.AstHelper()
-           * firstCondition = secondCondition
-           * secondCondition = ""
-           * }
-           * */
         }
 
         // Checks if the conditional node is required to describe the conditional code.
@@ -228,25 +216,12 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
           if (rootNode.isDefined && isJoernChoiceNode(rootNode.get)) {
             // If the root node of the sub AST is a conditional/chiose node.
 
-            /**
-             * // Updates/extends the presence conditions of the conditional/choise node.
-             * val choiceNode: NewControlStructure = rootNode.get.asInstanceOf[NewControlStructure] // TODO: Check whether this update is actually needed.
-             * val presenceCondition: Map[String, String] = getPresenceConditions(choiceNode)
-             * val newPresenceCondition: Map[String, String] = presenceCondition.view.mapValues((conditionString: String) => {
-             * logicHandler.combineAndSimplyConditions(conditions ++ Seq(conditionString))
-             * }).toMap
-             * //choiceNode.presenceCondition = newPresenceCondition.asJson.noSpaces
-             * updatePresenceCondition(choiceNode, newPresenceCondition)
-             * */
-
             // Returns the sub AST. A modification of the root choice node is not necessary because the condition of the
             // choice node always also incloud all conditions of the parent conditional/choice nodes.
             subAst
 
           } else {
             // If the root node of th sub AST is a normale node.
-            // val conditionString: String = logicHandler.combineAndSimplyConditions(conditions)
-            // createConditionalNode(conditionalNode, conditionString, subAst)
 
             // The passed condition is, by construction, the simplified condition that already contains all parent
             // conditions. So no modification is required to the passed condition.
@@ -402,7 +377,7 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
         val code: String = sortedAstOfInterested.map(ast => ast.root.get.properties("CODE").asInstanceOf[String])
           .mkString("\n")
 
-        // Creates the root coe block node and the combind AST.
+        // Creates the root coe block node and the combined AST.
         val blockNode: NewBlock = vAstCreator.blockNodeHelper(rootNode, s"{$code}", "void", line, column)
         vAstCreator.blockAstHelper(blockNode, sortedAstOfInterested.toList)
     }
@@ -803,16 +778,6 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
       val logicHandler: VAstLogicHandler = converter.getLogicHandler
       groupedSubAsts.map((logicString: ListBuffer[String], ast: Ast) => {
         println(s"logic string: \"$logicString\"")
-        /** TODO: Can be removed — outdated implementation
-        val combinedTerm: Seq[Seq[String]] = logicString.mkString(" || ").split(" \\|\\| ").map((terms: String) => terms.split(" && ").toSeq).toSeq
-
-        // Simplifies the combined expression.
-        println(s"combined terms for simplification: \"$combinedTerm\"")
-        val normalizedCombinedTerm: Seq[Seq[String]] = logicHandler.simplify(combinedTerm)
-        println(s"calculate thte prime implicans of : \"$normalizedCombinedTerm\"")
-        val simplifiedCombinedTerm: Seq[Seq[String]] = logicHandler.getPrimeImplicants(normalizedCombinedTerm)
-        val simplifiedCombinedExpression: String = simplifiedCombinedTerm.map((innerPart: Seq[String]) => innerPart.mkString(" && ")).mkString(" || ")
-        **/
 
         val simplifiedCombinedExpression: String  = logicHandler.combineAndSimplyConditionsOr(logicString.toSeq)
         (simplifiedCombinedExpression, ast)
