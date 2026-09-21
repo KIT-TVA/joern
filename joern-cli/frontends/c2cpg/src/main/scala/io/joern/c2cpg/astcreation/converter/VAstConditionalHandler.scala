@@ -235,7 +235,7 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
     // contains at least one sub AST with a satisfiable condition.
     val (firstCondition: String, firstConditionalSubtree: Node, secondCondition, secondConditionalSubtree) =
       extractConditionsAndSubtrees(conditionalNode, converterState)
-    
+
     if (!logicHandler.isSatisfiable(firstCondition)) {
       // If the current SuperC conditional node does not contain at least one satisfiable condition.
       Seq.empty[Ast]

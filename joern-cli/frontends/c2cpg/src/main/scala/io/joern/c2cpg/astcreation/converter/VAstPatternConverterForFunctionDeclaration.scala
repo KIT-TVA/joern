@@ -15,8 +15,9 @@ import scala.collection.mutable.ListBuffer
 
 class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, converter: VAstConverter)
   extends VAstPatternConverter(vAstCreator, converter, List.apply("FunctionDefinition")) {
+  private val logicHandler: VAstLogicHandler = converter.getLogicHandler
   private val conditionalHandler: VAstConditionalHandler = converter.getConditionalHandler
-  private val declarationHandler: VAstDeclarationHandler = converter.getDeclarationHandler
+  private val variableHandler: VAstVariableHandler = converter.getDeclarationHandler
 
   private val FUNCTION_DECLARATION: Int = 0
   private val FUNCTION_CODE_INDEX: Int = 1
@@ -222,7 +223,7 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
             if (location == null) (None, None) else (Option(location.line), Option(location.column))
 
           // Creates each JOERN method parameter node.
-          declarationHandler.handleDeclaration(parameterNameRootNode, parameterType, state,
+          variableHandler.handleDeclaration(parameterNameRootNode, parameterType, state,
             (nameNode: Node, s: VAstConverterState, fullParameterType: String, parameterName: String, code: String) => {
               // The parameter index for each parameter Nod is set after all parameter nodes are translated and in the
               // right order because in some conditional situations the parameters in the SuperC AST may not in order.
@@ -248,7 +249,7 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
           val parameterNode: Node = parameterListNode.get(parameterNodeIndex).asInstanceOf[Node]
 
           // Extracts one method parameter.
-          val newParameterNodes: Seq[Ast] = conditionalHandler.handleAndSimplifyConditionalExtended(parameterNode, converterState,
+          val newParameterNodes: Seq[Ast] = conditionalHandler.handleAndSimplifyConditionalExtended(parameterNode, parameterTypeState,
             (conditionalParameterNode: Node, parameterState: VAstConverterState) => {
               if (conditionalParameterNode.getName.equals(FUNCTION_PARAMETER_LIST_NODE)) {
                 // If the SuperC node is a conditional "ParameterList" node (a second "ParameterList" node).
@@ -297,12 +298,12 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
     // Creates the parameter type signature.
     // Determines all possible parameter type orders.
     var parameterConfigurationMap: Map[String, Seq[String]] = Map.empty[String, Seq[String]]
-    for (parameter: Ast <- parameterNodes) {
+    for (parameter: Ast <- parameterNodes) { // Iterates over all parameter- and conditional parameter-nodes.
       parameter.root.get match {
         case parameterNode: NewMethodParameterIn =>
           // If the parameter is unconditional.
           val newParamType: Seq[String] = Seq(parameterNode.typeFullName)
-          if (parameterConfigurationMap.isEmpty) parameterConfigurationMap = Map("" -> newParamType) else {
+          if (parameterConfigurationMap.isEmpty) parameterConfigurationMap = Map("1" -> newParamType) else {
             parameterConfigurationMap = parameterConfigurationMap.map((condition: String, paramTypes: Seq[String]) =>
               (condition, paramTypes ++ newParamType))
           }
@@ -314,24 +315,41 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
             .filter((edge: AstEdge) => edge.src.equals(conditionalNode)).head.dst.asInstanceOf[NewMethodParameterIn]
           val newParamType: Seq[String] = Seq(parameterNode.typeFullName)
           if (parameterConfigurationMap.isEmpty) {
-            parameterConfigurationMap = Map("" -> Seq("none"), parameterCondition -> newParamType)
+            // If the first parameter is conditional.
+            parameterConfigurationMap = Map("1" -> Seq("none"), parameterCondition -> newParamType)
+
           } else {
+            // If the current parameter is not the first parameter.
             parameterConfigurationMap = parameterConfigurationMap.flatMap((condition: String, paramTypes: Seq[String]) => {
-              // The condition comparison based on the conditional string is possible because the Conditionality
+              // The condition comparison based on the conditional string is possible because the VAstConditionalHandler
               // ensures a deterministic order of the macro-variables in the conditional expressions.
               if (condition.contains(parameterCondition)) Seq((condition, paramTypes ++ newParamType)) // Condition already contained.
-              else if (combinedConditionSatisfiable(condition, parameterCondition)) Seq((condition, paramTypes)) // Combined condition not satisfiable.
-              else Seq((condition, paramTypes), (s"$condition ;; $parameterCondition", paramTypes ++ newParamType)) // ";;" is a unique conditional separator, that is not part of an expression
+              else if (!combinedConditionSatisfiable(condition, parameterCondition)) Seq((condition, paramTypes)) // Combined condition not satisfiable.
+              else Seq((condition, paramTypes), (s"$condition ;; $parameterCondition", paramTypes ++ newParamType)) // Combined condition satisfiable. | ";;" is a unique conditional separator, that is not part of an expression.
             })
           }
       }
     }
 
-    // Removes any “none” parameter that is outdated. TODO: Internal data processing
+    // Removes any “none” parameter that is outdated.
+    val removeCondition1: Boolean = if (parameterConfigurationMap.contains("1")
+      && (parameterConfigurationMap("1").size > 1 || !parameterConfigurationMap("1").head.equals("none"))) false else {
+      // If the condition "1" only contains Seq("none").
+      // Checks if the method has at least one conditional configuration that has no parameters.
+      val allTypeConditions: Seq[String] = parameterConfigurationMap.toSeq
+        .flatMap((condition: String, parameterTypes: Seq[String]) => if (condition.equals("1")) None else {
+          val allConditions: Seq[String] = condition.split(" ;; ").toSeq
+          val combinedCondition: String = logicHandler.combineAndSimplyConditionsAnd(allConditions)
+          Option(combinedCondition)
+        })
+      val combinedTypeConditions: String = logicHandler.combineAndSimplyConditionsOr(allTypeConditions)
+      logicHandler.isTautology(combinedTypeConditions)
+    }
     val parameterConfigurations: Seq[Seq[String]] = parameterConfigurationMap.toSeq
-      .map((condition: String, parameterTypes: Seq[String]) => {
-        if (parameterTypes.size > 1 && parameterTypes.head.equals("none")) parameterTypes.tail
-        else parameterTypes
+      .flatMap((condition: String, parameterTypes: Seq[String]) => {
+        if (condition.equals("1") && removeCondition1) None // If the method always has at lest one parameter.
+        else if (parameterTypes.size > 1 && parameterTypes.head.equals("none")) Option(parameterTypes.tail) // Removes the "none" parameter type, that is no longer needed.
+        else Option(parameterTypes)
       })
 
     // Determines the maximal number of parameters.
@@ -386,18 +404,9 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
   }
 
   private def combinedConditionSatisfiable(conditions: String, parameterCondition: String): Boolean = {
-    // TODO: Muss noch vervollständigt werden; die aktuelle Implementierung ist fehlerhaft und unvollständig
-    //  (zu restriktiv/erkennt nicht die eigentlichen Fälle). Verwende Logic Expression Handler für Detection.
-    parameterCondition.replace(" ", "").split("\\|\\|").flatMap((expression: String) => expression.split("&&"))
-      .exists((logicVariable: String) => {
-        val invertedVariable: String = if (logicVariable.startsWith("!")) logicVariable.substring(1) else s"!$logicVariable"
-        !conditions.contains(invertedVariable)
-      })
-
-    // conditions.replace(" ", "").split(";;").exists((condition: String) => {
-    //  condition.split("\\|\\|").exists((conditionPart: String) => )
-    // })
-    true
+    val allConditions: Seq[String] = conditions.split(" ;; ").toSeq ++ Seq(parameterCondition)
+    val combinedCondition: String = logicHandler.combineAndSimplyConditionsAnd(allConditions)
+    logicHandler.isSatisfiable(combinedCondition)
   }
 
   /**

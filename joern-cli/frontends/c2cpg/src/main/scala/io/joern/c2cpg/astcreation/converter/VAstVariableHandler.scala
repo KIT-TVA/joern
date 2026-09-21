@@ -7,7 +7,7 @@ import xtc.tree.{Location, Node}
 /**
  * This is a helper class to simplify the handling of parameters and variable declarations.
  */
-class VAstDeclarationHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
+class VAstVariableHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
   extends VAstHandler(vAstCreator, converter) {
   
   private val conditionalHandler: VAstConditionalHandler = converter.getConditionalHandler
@@ -72,7 +72,7 @@ class VAstDeclarationHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
           val parameterName: String = parameterNameNode.getString(0)
 
           // Determines the array information and creates the parameter nodes.
-          conditionalHandler.handleAndSimplifyConditionalExtended(node.getNode(1), converterState,
+          conditionalHandler.handleAndSimplifyConditionalExtended(node.getNode(1), parameterNameState,
                                                                   (n: Node, state: VAstConverterState) => {
             handleArrayDimensions(n, state, parameterCreator, nameNode, parameterType, pointerInformation,
                                   parameterName, "", line, column)

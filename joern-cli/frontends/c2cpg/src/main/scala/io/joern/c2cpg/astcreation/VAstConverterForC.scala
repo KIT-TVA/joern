@@ -1,11 +1,11 @@
 package io.joern.c2cpg.astcreation
 
-import io.joern.c2cpg.astcreation.converter.{VASTPatternConverterForEmptyDefinition, VAstConditionalHandler, VAstConverter, VAstDeclarationHandler, VAstLogicHandler, VAstPatternConverter, VAstPatternConverterForBinaryOperators, VAstPatternConverterForCast, VAstPatternConverterForConditionalMacro, VAstPatternConverterForFunctionCall, VAstPatternConverterForFunctionDeclaration, VAstPatternConverterForMemberAccess, VAstPatternConverterForParenthesizedExpression, VAstPatternConverterForReturn, VAstPatternConverterForSuperCRoot, VAstPatternConverterForUnaryOperators, VAstPatternConverterForVariableDeclaration, VAstPatternConverterForWhileLoop}
+import io.joern.c2cpg.astcreation.converter.{VASTPatternConverterForEmptyDefinition, VAstConditionalHandler, VAstConverter, VAstVariableHandler, VAstLogicHandler, VAstPatternConverter, VAstPatternConverterForBinaryOperators, VAstPatternConverterForCast, VAstPatternConverterForConditionalMacro, VAstPatternConverterForFunctionCall, VAstPatternConverterForFunctionDeclaration, VAstPatternConverterForMemberAccess, VAstPatternConverterForParenthesizedExpression, VAstPatternConverterForReturn, VAstPatternConverterForSuperCRoot, VAstPatternConverterForUnaryOperators, VAstPatternConverterForVariableDeclaration, VAstPatternConverterForWhileLoop}
 
 class VAstConverterForC(private var vAstCreator: VAstCreatorNew) extends VAstConverter(vAstCreator) {
   super.addLogicHandler(new VAstLogicHandler(vAstCreator, this))
   super.addConditionalHandler(new VAstConditionalHandler(vAstCreator, this))
-  super.addDeclarationHandler(new VAstDeclarationHandler(vAstCreator, this))
+  super.addDeclarationHandler(new VAstVariableHandler(vAstCreator, this))
 
   private val patterns: List[VAstPatternConverter] = List.apply(
     new VAstPatternConverterForBinaryOperators(vAstCreator, this),
