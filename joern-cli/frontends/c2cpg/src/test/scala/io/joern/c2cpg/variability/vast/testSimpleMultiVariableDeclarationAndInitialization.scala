@@ -26,7 +26,7 @@ class testSimpleMultiVariableDeclarationAndInitialization extends C2CpgSuite(wit
       |""".stripMargin
   val cCpg: TestCpg = code(cCode, cFilename)
   val cTraversal: Iterator[Method] = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
-  val cAstDotString: Iterator[String] = DotAstGenerator.dotAst(cTraversal, extended_view = true)
+  val cAstDotString: Iterator[String] = DotAstGenerator.dotAst(cTraversal, extendedView=true, withColoring=true)
   println("Standard Joern C AST:")
   println(cAstDotString.mkString)
 
