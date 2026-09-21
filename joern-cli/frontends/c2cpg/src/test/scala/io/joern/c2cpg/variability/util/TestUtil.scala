@@ -44,11 +44,15 @@ object TestUtil {
   def generateVASTDot(cCode: String, cFileName: String, onlyGlobalGraph: Boolean): (String, String) = 
     generateVASTDot(cCode, Option(cFileName), onlyGlobalGraph)
 
-  def generateVASTDot(cCode: String, cFileName: Option[String], onlyGlobalGraph: Boolean): (String, String) = {
-    val (superCDotGraph, vcpg) = generateVCPG(cCode, cFileName = cFileName, onlyVAST = true)
-    // val astDotGraphs: Iterator[String] = DotAstGenerator.dotAst(vcpg, extendedView = true)
-    val astDotGraphs: Iterator[String] = DotCpg14Generator.toDotCpg14(vcpg, extendedView=true, withColoring=true,
-                                                                      forceTreeStructure=true)
+  def generateVASTDot(cCode: String, cFileName: Option[String], onlyGlobalGraph: Boolean,
+                      onlyVAST: Boolean = true): (String, String) = {
+    val (superCDotGraph, vcpg) = generateVCPG(cCode, cFileName = cFileName, onlyVAST = onlyVAST)
+    val astDotGraphs: Iterator[String] = if (onlyVAST) {
+      DotAstGenerator.dotAst(vcpg, extendedView = true, withColoring = true)
+    } else {
+      DotCpg14Generator.toDotCpg14(vcpg, extendedView = true, withColoring = true, forceTreeStructure = true)
+    }
+
     if (onlyGlobalGraph) {
       (superCDotGraph,
         astDotGraphs.filter(dotGraph => dotGraph.startsWith(s"digraph \"$GLOBAL_DOT_GRAPH_IDENTIFIER\" {")).mkString)
