@@ -62,16 +62,21 @@ class VAstDeclarationHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
                    parameterCreator, converterState)
 
       case nodeName if (nodeName.equals(ARRAY_PARAMETER_DECLARATION)) =>
-        val parameterNameNode: Node = node.getNode(0).getNode(0)
-        val location: Location = parameterNameNode.getLocation
-        val line: Option[Int] = Option(location.line)
-        val column: Option[Int] = Option(location.column)
-        val parameterName: String = parameterNameNode.getString(0)
+        // Extracts the parameter name.
+        conditionalHandler.handleAndSimplifyConditionalExtended(node.getNode(0), converterState,
+                                                                (rootParameterNameNode: Node, parameterNameState: VAstConverterState) => {
+          val parameterNameNode: Node = rootParameterNameNode.getNode(0)
+          val location: Location = parameterNameNode.getLocation
+          val line: Option[Int] = Option(location.line)
+          val column: Option[Int] = Option(location.column)
+          val parameterName: String = parameterNameNode.getString(0)
 
-        conditionalHandler.handleAndSimplifyConditionalExtended(node.getNode(1), converterState,
-                                                                (n: Node, state: VAstConverterState) => {
-          handleArrayDimensions(n, state, parameterCreator, nameNode, parameterType, pointerInformation,
-                                parameterName, "", line, column)
+          // Determines the array information and creates the parameter nodes.
+          conditionalHandler.handleAndSimplifyConditionalExtended(node.getNode(1), converterState,
+                                                                  (n: Node, state: VAstConverterState) => {
+            handleArrayDimensions(n, state, parameterCreator, nameNode, parameterType, pointerInformation,
+                                  parameterName, "", line, column)
+          })
         })
     }
   }

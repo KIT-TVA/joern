@@ -239,35 +239,40 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
       }
 
       // Extracts all method parameter.
-      val parameterListNode: Node = parameterTypeListNode.getNode(0).getNode(0) // root node of all parameters (including the conditional ones)
-      val numberOfParameters: Int = parameterListNode.size
-      for (parameterNodeIndex: Int <- 0 until numberOfParameters) { // Iterates over all parameters (parameter nodes).
-        val parameterNode: Node = parameterListNode.get(parameterNodeIndex).asInstanceOf[Node]
+      parameterNodes = conditionalHandler.handleAndSimplifyConditionalExtended(parameterTypeListNode, converterState,
+                                                                               (typeListNode: Node, parameterTypeState: VAstConverterState) => {
+        var conditionalParameterNodes: Seq[Ast] = Seq.empty[Ast]
+        val parameterListNode: Node = typeListNode.getNode(0).getNode(0) // root node of all parameters (including the conditional ones)
+        val numberOfParameters: Int = parameterListNode.size
+        for (parameterNodeIndex: Int <- 0 until numberOfParameters) { // Iterates over all parameters (parameter nodes).
+          val parameterNode: Node = parameterListNode.get(parameterNodeIndex).asInstanceOf[Node]
 
-        // Extracts one method parameter.
-        val newParameterNodes: Seq[Ast] = conditionalHandler.handleAndSimplifyConditionalExtended(parameterNode, converterState,
-          (conditionalParameterNode: Node, parameterState: VAstConverterState) => {
-            if (conditionalParameterNode.getName.equals(FUNCTION_PARAMETER_LIST_NODE)) {
-              // If the SuperC node is a conditional "ParameterList" node (a second "ParameterList" node).
-              var conditionalParameterAsts: Seq[Ast] = Seq.empty[Ast]
-              val numberOfConditionalParameters: Int = conditionalParameterNode.size
-              if (numberOfConditionalParameters > 0) {
-                for (conditionalParameterIndex: Int <- 0 until numberOfConditionalParameters) { // Iterates over a conditional subset parameters (parameter nodes) that share at least on condition.
-                  val currentNode: Node = conditionalParameterNode.getNode(conditionalParameterIndex)
-                  conditionalParameterAsts = conditionalParameterAsts
-                    ++ conditionalHandler.handleAndSimplifyConditionalExtended(currentNode, parameterState,
-                                                                               methodParameterExtractor)
+          // Extracts one method parameter.
+          val newParameterNodes: Seq[Ast] = conditionalHandler.handleAndSimplifyConditionalExtended(parameterNode, converterState,
+            (conditionalParameterNode: Node, parameterState: VAstConverterState) => {
+              if (conditionalParameterNode.getName.equals(FUNCTION_PARAMETER_LIST_NODE)) {
+                // If the SuperC node is a conditional "ParameterList" node (a second "ParameterList" node).
+                var conditionalParameterAsts: Seq[Ast] = Seq.empty[Ast]
+                val numberOfConditionalParameters: Int = conditionalParameterNode.size
+                if (numberOfConditionalParameters > 0) {
+                  for (conditionalParameterIndex: Int <- 0 until numberOfConditionalParameters) { // Iterates over a conditional subset parameters (parameter nodes) that share at least on condition.
+                    val currentNode: Node = conditionalParameterNode.getNode(conditionalParameterIndex)
+                    conditionalParameterAsts = conditionalParameterAsts
+                      ++ conditionalHandler.handleAndSimplifyConditionalExtended(currentNode, parameterState,
+                                                                                 methodParameterExtractor)
+                  }
                 }
-              }
-              conditionalParameterAsts
+                conditionalParameterAsts
 
-            } else {
-              // If the SuperC node is a "ParameterIdentifierDeclaration" node.
-              methodParameterExtractor(conditionalParameterNode, parameterState)
-            }
-          })
-        parameterNodes = parameterNodes ++ newParameterNodes
-      }
+              } else {
+                // If the SuperC node is a "ParameterIdentifierDeclaration" node.
+                methodParameterExtractor(conditionalParameterNode, parameterState)
+              }
+            })
+          conditionalParameterNodes = conditionalParameterNodes ++ newParameterNodes
+        }
+        conditionalParameterNodes
+      })
     }
 
     // Sorts the parameters by is position in the method signature.
