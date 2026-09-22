@@ -30,7 +30,7 @@ class VAstLogicHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
       normalizedExpression.nonEmpty
   }
 
-  def combineAndSimplyConditionsAnd(conditions: Seq[String]): String = {
+  def combineAndSimplifyConditionsAnd(conditions: Seq[String]): String = {
     conditions.size match {
       case 0 => "1"
       case 1 => simplify(conditions.head)
@@ -38,13 +38,13 @@ class VAstLogicHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
       val allExpressions: Seq[Seq[Seq[String]]] = conditions.map ((condition: String) => stringToExpression(condition))
       var combinedAndSimplifiedExpression: Seq[Seq[String]] = allExpressions.head
       for (nextExpression: Seq[Seq[String]] <- allExpressions.tail) {
-        combinedAndSimplifiedExpression = combineAndSimplyTwoExpressionsAnd(combinedAndSimplifiedExpression, nextExpression)
+        combinedAndSimplifiedExpression = combineAndSimplifyTwoExpressionsAnd(combinedAndSimplifiedExpression, nextExpression)
       }
       expressionToString(combinedAndSimplifiedExpression)
     }
   }
 
-  private def combineAndSimplyTwoExpressionsAnd(firstExpression: Seq[Seq[String]],
+  private def combineAndSimplifyTwoExpressionsAnd(firstExpression: Seq[Seq[String]],
                                                 secondExpression: Seq[Seq[String]]): Seq[Seq[String]] = {
     // Combines the conditions.
     val combinedExpression: Seq[Seq[String]] = firstExpression.flatMap((firstAndExpression: Seq[String]) => {
@@ -55,7 +55,7 @@ class VAstLogicHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
     simplify(combinedExpression)
   }
 
-  def combineAndSimplyConditionsOr(conditions: Seq[String]): String = {
+  def combineAndSimplifyConditionsOr(conditions: Seq[String]): String = {
     // Checks if one of the passed conditions a tautology is.
     if (conditions.exists((condition: String) => isTautology(condition))) {
       // If one of the conditions is a tautology.
@@ -85,6 +85,14 @@ class VAstLogicHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
     })
     
     if (andTerms.exists((andTerm: String) => isTrue(andTerm))) "1" else  andTerms.sorted.mkString(" || ")
+  }
+  
+  def equivalent(firstCondition: String, secondCondition: String): Boolean = {
+    val simplifiedFirstCondition: String = simplify(firstCondition)
+    val simplifiedSecondCondition: String = simplify(secondCondition)
+    
+    // Checks if the conditions are equivalent.
+    simplifiedFirstCondition.equals(simplifiedSecondCondition)
   }
   
   private def simplify(condition: String): String = {

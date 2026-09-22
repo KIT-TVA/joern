@@ -339,10 +339,10 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
       val allTypeConditions: Seq[String] = parameterConfigurationMap.toSeq
         .flatMap((condition: String, parameterTypes: Seq[String]) => if (condition.equals("1")) None else {
           val allConditions: Seq[String] = condition.split(" ;; ").toSeq
-          val combinedCondition: String = logicHandler.combineAndSimplyConditionsAnd(allConditions)
+          val combinedCondition: String = logicHandler.combineAndSimplifyConditionsAnd(allConditions)
           Option(combinedCondition)
         })
-      val combinedTypeConditions: String = logicHandler.combineAndSimplyConditionsOr(allTypeConditions)
+      val combinedTypeConditions: String = logicHandler.combineAndSimplifyConditionsOr(allTypeConditions)
       logicHandler.isTautology(combinedTypeConditions)
     }
     val parameterConfigurations: Seq[Seq[String]] = parameterConfigurationMap.toSeq
@@ -405,7 +405,7 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
 
   private def combinedConditionSatisfiable(conditions: String, parameterCondition: String): Boolean = {
     val allConditions: Seq[String] = conditions.split(" ;; ").toSeq ++ Seq(parameterCondition)
-    val combinedCondition: String = logicHandler.combineAndSimplyConditionsAnd(allConditions)
+    val combinedCondition: String = logicHandler.combineAndSimplifyConditionsAnd(allConditions)
     logicHandler.isSatisfiable(combinedCondition)
   }
 

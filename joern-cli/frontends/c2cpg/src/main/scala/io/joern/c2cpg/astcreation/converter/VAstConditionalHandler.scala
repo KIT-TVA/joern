@@ -280,6 +280,17 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
     && node.label.equals(JOERN_CONTROL_STRUCTURE_NODE_LABEL)
     && node.asInstanceOf[NewControlStructure].controlStructureType.equals(ControlStructureTypes.CHOICE)
 
+  /**
+   * Returns the current simplified condition.
+   * 
+   * @param converterState The current converter state.
+   * @return Returns the current simplified condition.
+   */
+  def getCurrentCondition(converterState: VAstConverterState): String = {
+    val allParentConditions: Seq[String] = converterState.getState(this).asInstanceOf[Seq[String]]
+    if (allParentConditions.isEmpty) "1" else allParentConditions.last
+  }
+
   def getFirstSuperCCondition(node: Node): String = {
     require(isSuperCConditionalNode(node),
             "A conditional node was expected, but a node of a different node type was passed.")
@@ -503,14 +514,14 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
     var firstConditionalSubtree: Node = getFirstSuperCConditionalSubtree(conditionalNode)
 
     // Combines and simplified the condition of the first sub AST.
-    var firstSimplifiedCondition: String = logicHandler.combineAndSimplyConditionsAnd(allParentConditions ++ Seq(firstCondition))
+    var firstSimplifiedCondition: String = logicHandler.combineAndSimplifyConditionsAnd(allParentConditions ++ Seq(firstCondition))
 
     // Extracts the simplified second condition and its AST if defined.
     var secondSimplifiedCondition: String = if (conditionalNode.size == FULL_CONDITIONAL_MACRO) {
       val secondCondition: String = getSecondSuperCCondition(conditionalNode).get
 
       // Combines and simplified the condition of the second sub AST.
-      logicHandler.combineAndSimplyConditionsAnd(allParentConditions ++ Seq(secondCondition))
+      logicHandler.combineAndSimplifyConditionsAnd(allParentConditions ++ Seq(secondCondition))
     } else "0" // If the conditional node only contains one sub AST.
     var secondConditionalSubtree: Node = if (conditionalNode.size == FULL_CONDITIONAL_MACRO) {
       getSecondSuperCConditionalSubtree(conditionalNode).get
@@ -779,7 +790,7 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
       groupedSubAsts.map((logicString: ListBuffer[String], ast: Ast) => {
         println(s"logic string: \"$logicString\"")
 
-        val simplifiedCombinedExpression: String  = logicHandler.combineAndSimplyConditionsOr(logicString.toSeq)
+        val simplifiedCombinedExpression: String  = logicHandler.combineAndSimplifyConditionsOr(logicString.toSeq)
         (simplifiedCombinedExpression, ast)
       }).toSeq
     }
