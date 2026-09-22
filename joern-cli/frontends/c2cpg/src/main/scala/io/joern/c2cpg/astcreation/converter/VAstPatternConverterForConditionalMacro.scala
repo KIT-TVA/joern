@@ -6,7 +6,7 @@ import xtc.tree.Node
 
 class VAstPatternConverterForConditionalMacro(vAstCreator: VAstCreatorNew, converter: VAstConverter)
   extends VAstPatternConverter(vAstCreator, converter, List.apply("Conditional")) {
-  
+
   private val conditionalHandler = converter.getConditionalHandler
 
   override def convert(superCVAst: Node, converterState: VAstConverterState): Option[Seq[Ast]] = {
