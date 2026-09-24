@@ -36,11 +36,21 @@ class VAstLogicHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
       case 1 => simplify(conditions.head)
       case _ =>
       val allExpressions: Seq[Seq[Seq[String]]] = conditions.map ((condition: String) => stringToExpression(condition))
-      var combinedAndSimplifiedExpression: Seq[Seq[String]] = allExpressions.head
-      for (nextExpression: Seq[Seq[String]] <- allExpressions.tail) {
-        combinedAndSimplifiedExpression = combineAndSimplifyTwoExpressionsAnd(combinedAndSimplifiedExpression, nextExpression)
-      }
+      val combinedAndSimplifiedExpression: Seq[Seq[String]] = combineAndSimplifyConditionsAnd(allExpressions)
       expressionToString(combinedAndSimplifiedExpression)
+    }
+  }
+  
+  private def combineAndSimplifyConditionsAnd(expressions: Seq[Seq[Seq[String]]]): Seq[Seq[String]] = {
+    expressions.size match {
+      case 0 => Seq(Seq("1"))
+      case 1 => simplify(expressions.head)
+      case _ =>
+        var combinedAndSimplifiedExpression: Seq[Seq[String]] = expressions.head
+        for (nextExpression: Seq[Seq[String]] <- expressions.tail) {
+        combinedAndSimplifiedExpression = combineAndSimplifyTwoExpressionsAnd (combinedAndSimplifiedExpression, nextExpression)
+        }
+        combinedAndSimplifiedExpression
     }
   }
 
@@ -113,6 +123,20 @@ class VAstLogicHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
         // the passed expression itself is not a tautology.
         getPrimeImplicants(exp)
     }
+  }
+  
+  def excludeConditionAndSimplify(condition: String, excludeCondition: String): String = {
+    val expression: Seq[Seq[String]] = stringToExpression(condition)
+    val excludeExpression: Seq[Seq[String]] = stringToExpression(excludeCondition)
+    val negateExclusionExpression: Seq[Seq[String]] = negateAndSimplifyExpression(excludeExpression)
+    val combinedExpression: Seq[Seq[String]] = combineAndSimplifyTwoExpressionsAnd(expression, negateExclusionExpression)
+    expressionToString(combinedExpression)
+  }
+  
+  private def negateAndSimplifyExpression(expression: Seq[Seq[String]]): Seq[Seq[String]] = {
+    val negatedExpression: Seq[Seq[Seq[String]]] = expression
+      .map((andExpression: Seq[String]) => andExpression.map((variable: String) => Seq(negate(variable))))
+    combineAndSimplifyConditionsAnd(negatedExpression)
   }
 
   /**

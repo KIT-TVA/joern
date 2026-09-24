@@ -282,7 +282,7 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
 
   /**
    * Returns the current simplified condition.
-   * 
+   *
    * @param converterState The current converter state.
    * @return Returns the current simplified condition.
    */
@@ -515,6 +515,10 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
 
     // Combines and simplified the condition of the first sub AST.
     var firstSimplifiedCondition: String = logicHandler.combineAndSimplifyConditionsAnd(allParentConditions ++ Seq(firstCondition))
+
+    if (conditionalNode.size != FULL_CONDITIONAL_MACRO && !allParentConditions.isEmpty && logicHandler.equivalent(allParentConditions.last, firstSimplifiedCondition)) {
+      firstSimplifiedCondition = "1"
+    }
 
     // Extracts the simplified second condition and its AST if defined.
     var secondSimplifiedCondition: String = if (conditionalNode.size == FULL_CONDITIONAL_MACRO) {
