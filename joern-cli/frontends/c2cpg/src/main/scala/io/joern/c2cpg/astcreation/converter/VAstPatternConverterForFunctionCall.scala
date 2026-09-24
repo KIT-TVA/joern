@@ -15,6 +15,8 @@ class VAstPatternConverterForFunctionCall(vAstCreator: VAstCreatorNew, converter
       "ExpressionStatement"
     )
   ) {
+  
+  private val conditionalHandler = converter.getConditionalHandler
 
   override def convert(superCVAst: Node, converterState: VAstConverterState): Option[Seq[Ast]] = {
     // converter.getConditionalHandler.handelAndSimplifyConditional(...)
@@ -27,8 +29,7 @@ class VAstPatternConverterForFunctionCall(vAstCreator: VAstCreatorNew, converter
         }
       case Some(callNode) =>
         val nameNode = callNode.getNode(0)
-        val argsNode = callNode.getNode(1)
-        val conditionalHandler = converter.getConditionalHandler
+        val argsNode = if (callNode.size > 1) Option(callNode.getNode(1)) else None
         if (conditionalHandler.isSuperCConditionalNode(nameNode)) {
           val restructuredCall: Node = conditionalHandler.createConditionalSuperCSubtree(
             nameNode,
@@ -50,10 +51,10 @@ class VAstPatternConverterForFunctionCall(vAstCreator: VAstCreatorNew, converter
       case _ => None
     }
 
-  private def buildFunctionCallNode(nameNode: Node, argsNode: Node): Node = {
+  private def buildFunctionCallNode(nameNode: Node, argsNode: Option[Node]): Node = {
     val functionCall: Node = GNode.create("FunctionCall", 2)
     functionCall.add(0, nameNode)
-    functionCall.add(1, argsNode)
+    if (argsNode.isDefined) functionCall.add(1, argsNode.get)
     functionCall
   }
 
@@ -61,7 +62,7 @@ class VAstPatternConverterForFunctionCall(vAstCreator: VAstCreatorNew, converter
                             rootNode: Node,
                             callNode: Node,
                             nameNode: Node,
-                            argsNode: Node,
+                            argsNode: Option[Node],
                             converterState: VAstConverterState
                           ): Ast = {
     val name = extractFunctionName(nameNode)
@@ -89,10 +90,10 @@ class VAstPatternConverterForFunctionCall(vAstCreator: VAstCreatorNew, converter
     if (nameNode.size() > 0) nameNode.getNode(0).getString(0)
     else nameNode.getString(0)
 
-  private def convertArguments(argsNode: Node, converterState: VAstConverterState): Seq[Ast] =
-    if (argsNode.size() == 0) Seq.empty
+  private def convertArguments(argsNode: Option[Node], converterState: VAstConverterState): Seq[Ast] =
+    if (argsNode.isEmpty || argsNode.get.size() == 0) Seq.empty
     else {
-      getChildren(argsNode).flatMap {
+      getChildren(argsNode.get).flatMap {
         case list if list.getName == "StringLiteralList" || list.getName == "ExpressionList" =>
           getChildren(list).map(argumentConverter(_, converterState))
         case node =>
@@ -111,7 +112,6 @@ class VAstPatternConverterForFunctionCall(vAstCreator: VAstCreatorNew, converter
     }
 
   private def argumentConverter(node: Node, converterState: VAstConverterState): Ast = {
-    val conditionalHandler = converter.getConditionalHandler
     if (conditionalHandler.isSuperCConditionalNode(node)) {
       if (conditionalHandler.getFirstSuperCCondition(node) == "1") {
         argumentConverter(conditionalHandler.getFirstSuperCConditionalSubtree(node), converterState)

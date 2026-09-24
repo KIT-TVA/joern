@@ -62,7 +62,7 @@ class testWhile extends C2CpgSuite(withOssDataflow = true) {
 
   val cCpg: TestCpg = code(cCode, "test_while.c")
   val cTraversal: Iterator[Method] = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
-  val cAstDotString: Iterator[String] = DotAstGenerator.dotAst(cTraversal, extended_view = true)
+  val cAstDotString: Iterator[String] = DotAstGenerator.dotAst(cTraversal, extendedView = true)
   println("Standard Joern C AST:")
   println(cAstDotString.mkString)
 

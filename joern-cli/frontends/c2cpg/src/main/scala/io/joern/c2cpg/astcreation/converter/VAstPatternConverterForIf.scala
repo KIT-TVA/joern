@@ -80,7 +80,8 @@ class VAstPatternConverterForIf(vAstCreator: VAstCreatorNew, converter: VAstConv
       )
       vAstCreator.blockAstHelper(block, stmtAsts.toList)
     } else {
-      converter.convert(bodyNode, converterState).headOption.getOrElse(vAstCreator.AstHelper())
+      converter.getConditionalHandler.handleConditional(bodyNode, converterState, (node: Node, state: VAstConverterState) => Seq(convertBody(node, state))).head
+      // converter.convert(bodyNode, converterState).headOption.getOrElse(vAstCreator.AstHelper())
     }
 
   private def convertSubtree(node: Node, converterState: VAstConverterState): Ast =

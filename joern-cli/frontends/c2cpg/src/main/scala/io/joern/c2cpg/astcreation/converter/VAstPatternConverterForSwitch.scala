@@ -26,6 +26,8 @@ class VAstPatternConverterForSwitch(vAstCreator: VAstCreatorNew, converter: VAst
       "DefaultLabeledStatement"
     )
   ) {
+  
+  private val conditionalHandler: VAstConditionalHandler = converter.getConditionalHandler
 
   override def convert(superCVAst: Node, converterState: VAstConverterState): Option[Seq[Ast]] = {
     superCVAst.getName match {
@@ -96,9 +98,8 @@ class VAstPatternConverterForSwitch(vAstCreator: VAstCreatorNew, converter: VAst
         val name = Option(n.getName).getOrElse("")
         if (name.contains("Statement") || name.contains("Language")) None
         else if (name == "Conditional") {
-          val h = converter.getConditionalHandler
-          if (h.isConditionalNode(n) && h.getFirstCondition(n) == "1")
-            textOf(h.getFirstConditionalSubtree(n))
+          if (conditionalHandler.isSuperCConditionalNode(n) && conditionalHandler.getFirstSuperCCondition(n) == "1")
+            textOf(conditionalHandler.getFirstSuperCConditionalSubtree(n))
           else None
         } else textOf(n)
       case _ =>
@@ -118,11 +119,11 @@ class VAstPatternConverterForSwitch(vAstCreator: VAstCreatorNew, converter: VAst
    * SuperC often wraps the switch body as Conditional("1", CompoundStatement).
    */
   private def convertBody(bodyNode: Node, converterState: VAstConverterState): Ast = {
-    val h = converter.getConditionalHandler
-    if (h.isConditionalNode(bodyNode) && h.getFirstCondition(bodyNode) == "1") {
-      convertBody(h.getFirstConditionalSubtree(bodyNode), converterState)
-    } else if (h.isConditionalNode(bodyNode)) {
-      wrapInBlock(bodyNode, h.handelConditional(bodyNode, converterState, (n, s) => convertChild(n, s)))
+    if (conditionalHandler.isSuperCConditionalNode(bodyNode)
+      && conditionalHandler.getFirstSuperCCondition(bodyNode) == "1") {
+      convertBody(conditionalHandler.getFirstSuperCConditionalSubtree(bodyNode), converterState)
+    } else if (conditionalHandler.isSuperCConditionalNode(bodyNode)) {
+      wrapInBlock(bodyNode, conditionalHandler.handleConditional(bodyNode, converterState, (n, s) => convertChild(n, s)))
     } else if (bodyNode.getName == "CompoundStatement" && bodyNode.size() >= 2) {
       val stmtAsts =
         getChildren(bodyNode.getNode(1)).flatMap(c => convertChild(c, converterState)).filterNot(isDummy)
@@ -143,10 +144,10 @@ class VAstPatternConverterForSwitch(vAstCreator: VAstCreatorNew, converter: VAst
 
   /** Unwrap Conditional("1",…); real #ifdef → CHOICE. */
   private def convertChild(node: Node, converterState: VAstConverterState): Seq[Ast] = {
-    val h = converter.getConditionalHandler
-    if (h.isConditionalNode(node)) {
-      if (h.getFirstCondition(node) == "1") convertChild(h.getFirstConditionalSubtree(node), converterState)
-      else h.handelConditional(node, converterState, (n, s) => convertChild(n, s))
+    if (conditionalHandler.isSuperCConditionalNode(node)) {
+      if (conditionalHandler.getFirstSuperCCondition(node) == "1") {
+        convertChild(conditionalHandler.getFirstSuperCConditionalSubtree(node), converterState)
+      } else conditionalHandler.handleConditional(node, converterState, (n, s) => convertChild(n, s))
     } else if (node.getName == "CompoundStatement") {
       Seq(convertBody(node, converterState))
     } else {
@@ -155,10 +156,9 @@ class VAstPatternConverterForSwitch(vAstCreator: VAstCreatorNew, converter: VAst
   }
 
   private def convertExpr(node: Node, converterState: VAstConverterState): Ast = {
-    val h = converter.getConditionalHandler
-    if (h.isConditionalNode(node) && h.getFirstCondition(node) == "1")
-      convertExpr(h.getFirstConditionalSubtree(node), converterState)
-    else {
+    if (conditionalHandler.isSuperCConditionalNode(node) && conditionalHandler.getFirstSuperCCondition(node) == "1") {
+      convertExpr(conditionalHandler.getFirstSuperCConditionalSubtree(node), converterState)
+    } else {
       val converted = converter.convert(node, converterState)
       if (converted.nonEmpty && converted.head.root.isDefined && !isDummy(converted.head)) converted.head
       else {

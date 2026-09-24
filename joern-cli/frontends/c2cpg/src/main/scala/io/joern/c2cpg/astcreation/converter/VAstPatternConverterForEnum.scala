@@ -25,6 +25,8 @@ class VAstPatternConverterForEnum(vAstCreator: VAstCreatorNew, converter: VAstCo
     List("Declaration", "SUETypeSpecifier", "EnumSpecifier")
   ) {
 
+  private val conditionalHandler: VAstConditionalHandler = converter.getConditionalHandler
+
   override def convert(superCVAst: Node, converterState: VAstConverterState): Option[Seq[Ast]] = {
     findEnumDefinition(superCVAst).flatMap(n => convertEnum(n, converterState).map(Seq(_)))
   }
@@ -71,10 +73,9 @@ class VAstPatternConverterForEnum(vAstCreator: VAstCreatorNew, converter: VAstCo
       .flatMap(textOf)
 
   private def convertOne(node: Node, enumTypeName: String, converterState: VAstConverterState): Seq[Ast] = {
-    val h = converter.getConditionalHandler
-    if (h.isConditionalNode(node)) {
-      if (h.getFirstCondition(node) == "1") convertOne(h.getFirstConditionalSubtree(node), enumTypeName, converterState)
-      else h.handelConditional(node, converterState, (n, s) => convertOne(n, enumTypeName, s))
+    if (conditionalHandler.isSuperCConditionalNode(node)) {
+      if (conditionalHandler.getFirstSuperCCondition(node) == "1") convertOne(conditionalHandler.getFirstSuperCConditionalSubtree(node), enumTypeName, converterState)
+      else conditionalHandler.handleConditional(node, converterState, (n, s) => convertOne(n, enumTypeName, s))
     } else if (node.getName == "Enumerator") {
       val memberName = safeNodeAt(node, 0).flatMap(textOf).getOrElse("")
       if (memberName.isEmpty) Seq.empty
