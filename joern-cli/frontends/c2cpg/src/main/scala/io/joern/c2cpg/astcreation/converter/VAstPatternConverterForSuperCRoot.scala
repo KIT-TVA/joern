@@ -4,7 +4,7 @@ import io.joern.c2cpg.astcreation.VAstCreatorNew
 import io.joern.c2cpg.astcreation.converter.VAstConverter
 import io.joern.x2cpg.{Ast, AstEdge}
 import io.shiftleft.codepropertygraph.generated.ControlStructureTypes
-import io.shiftleft.codepropertygraph.generated.nodes.{Method, NewBlock, NewControlStructure, NewMethod, NewMethodReturn, NewNode}
+import io.shiftleft.codepropertygraph.generated.nodes.{Method, NewBlock, NewControlStructure, NewMethod, NewMethodReturn, NewNode, NewTypeDecl}
 import xtc.tree.Node
 
 import scala.collection.mutable.ListBuffer
@@ -28,7 +28,7 @@ class VAstPatternConverterForSuperCRoot(vAstCreator: VAstCreatorNew, converter: 
       throw new RuntimeException("The structure of the SuperC VAST root does not match the expected structure.")
 
     // Creates the subtrees of all globale declarations.
-    val definedFunctions: ListBuffer[Ast] =  new ListBuffer[Ast]()
+    val definitions: ListBuffer[Ast] =  new ListBuffer[Ast]()
     val globalCodeBlockStatements: ListBuffer[Ast] = new ListBuffer[Ast]()
     for (index: Int <- 0 until externalDeclarationListNode.size) {
       val astSubtrees: Seq[Ast] = converter.convert(externalDeclarationListNode.getNode(index), converterState)
@@ -45,8 +45,8 @@ class VAstPatternConverterForSuperCRoot(vAstCreator: VAstCreatorNew, converter: 
 
         // Splits the subtrees into functions and other global declarations.
         astSubtreeRootNode.get match {
-          case methodeNodee: NewMethod => definedFunctions += astSubtree
-          case conditionalMethodeNode if (isConditionalMethod(conditionalMethodeNode, astSubtree)) => definedFunctions += astSubtree
+          case methodeDecNode if isMethodDeclaration(methodeDecNode, astSubtree) => definitions += astSubtree
+          case enumDecNode if isEnumDeclaration(enumDecNode, astSubtree) => definitions += astSubtree
           case _ => globalCodeBlockStatements += astSubtree
         }
       }
@@ -72,7 +72,7 @@ class VAstPatternConverterForSuperCRoot(vAstCreator: VAstCreatorNew, converter: 
 
     val method: Ast = vAstCreator.methodAstHelper(
       methodNode,
-      definedFunctions.toList,
+      definitions.toList,
       globalCodeBlock,
       returnStatement,
       modifiers = List()
@@ -80,14 +80,25 @@ class VAstPatternConverterForSuperCRoot(vAstCreator: VAstCreatorNew, converter: 
     Option(Seq(method))
   }
 
-  private def isConditionalMethod(rootNode: NewNode, ast: Ast): Boolean = {
-    if (!converter.getConditionalHandler.isJoernChoiceNode(rootNode)) {
-      false
-    } else {
+  private def isMethodDeclaration(rootNode: NewNode, ast: Ast): Boolean = {
+    if (rootNode.isInstanceOf[NewMethod]) true
+    else if (!converter.getConditionalHandler.isJoernChoiceNode(rootNode)) false
+    else {
       val childNodes: Seq[NewNode] = ast.edges
         .filter((edge: AstEdge) => (edge.src == rootNode))
         .map((edge: AstEdge) => edge.dst).toSeq
       (childNodes.size == 1) && childNodes.head.isInstanceOf[NewMethod]
+    }
+  }
+
+  private def isEnumDeclaration(rootNode: NewNode, ast: Ast): Boolean = {
+    if (rootNode.isInstanceOf[NewTypeDecl]) true
+    else if (!converter.getConditionalHandler.isJoernChoiceNode(rootNode)) false
+    else {
+      val childNodes: Seq[NewNode] = ast.edges
+        .filter((edge: AstEdge) => (edge.src == rootNode))
+        .map((edge: AstEdge) => edge.dst).toSeq
+      (childNodes.size == 1) && childNodes.head.isInstanceOf[NewTypeDecl]
     }
   }
 }
