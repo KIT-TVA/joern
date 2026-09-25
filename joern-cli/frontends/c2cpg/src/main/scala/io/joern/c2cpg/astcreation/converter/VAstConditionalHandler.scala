@@ -7,8 +7,9 @@ import io.joern.x2cpg.{Ast, AstEdge}
 import io.shiftleft.codepropertygraph.generated.ControlStructureTypes
 import io.shiftleft.codepropertygraph.generated.nodes.{AstNodeNew, NewBlock, NewControlStructure, NewNode}
 import superc.core.PresenceConditionManager.PresenceCondition
-import xtc.tree.{GNode, Node}
+import xtc.tree.{GNode, Location, Node}
 
+import scala.collection.JavaConverters.asScalaSetConverter
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.jdk.CollectionConverters.MapHasAsScala
@@ -168,7 +169,7 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
 
         } else {
           // If the current conditional node only replicated conditions and both conditions are satisfiable.
-          sortAstsByCodPosition(firstConditionalSubAsts ++ secondConditionalSubAsts)
+          sortAstsByCodePosition(firstConditionalSubAsts ++ secondConditionalSubAsts)
         }
       }
     }
@@ -261,6 +262,133 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
       handleAndSimplifyConditional(conditionalNode, converterState, conditionSubtreesCreator)
     } else conditionSubtreesCreator(conditionalNode, converterState)
 
+  def handleCombineAndSimplifyConditional(conditionalNode: Node, converterState: VAstConverter,
+                                          conditionSubtreesCreator: (Node, VAstConverterState) => Seq[Ast]): Ast = {
+    require(false, "The method \"handleCombineAndSimplifyConditional\" is not implemented")
+    vAstCreator.AstHelper()
+  }
+
+  def createJoernMultiChoiceNode(conditionalNode: Node, asts: Seq[(String, Ast)]): Ast = if (asts.isEmpty) {
+    // if no conditional subtree exists.
+    vAstCreator.AstHelper()
+
+  } else if ((asts.size == 1) && converter.getLogicHandler.isTautology(asts.head._1)) {
+    // if only one unconditional sub ast is passed
+    asts.head._2
+
+  } else {
+    // If one ore multiable conditional sub Asts are passed.
+    val logicHandler: VAstLogicHandler = converter.getLogicHandler
+
+    // Creates the conditional node.
+    val choiceNode: NewControlStructure =
+      vAstCreator.controlStructureNodeHelper(conditionalNode, ControlStructureTypes.CHOICE, "")
+
+    // Variables for the presence conditions handling.
+    var conditionIndex: Int = 1
+    var presenceConditionMap: Map[String, String] = Map.empty[String,String]
+    var presenceConditionEdges: Seq[AstEdge] = Seq.empty[AstEdge]
+    var subtreeCodes: Seq[String] = Seq.empty[String]
+
+    // AST node and edge variables.
+    var subtreeNodes: Seq[NewNode] = Seq.empty[NewNode]
+    var subtreeEdges: Seq[AstEdge] = Seq.empty[AstEdge]
+    var subtreeConditionEdges: Seq[AstEdge] = Seq.empty[AstEdge]
+    var subtreeArgEdges: Seq[AstEdge] = Seq.empty[AstEdge]
+    var subtreeReceiverEdges: Seq[AstEdge] = Seq.empty[AstEdge]
+    var subtreeRefEdges: Seq[AstEdge] = Seq.empty[AstEdge]
+    var subtreeBindsEdges: Seq[AstEdge] = Seq.empty[AstEdge]
+    var subtreeCaptureEdges: Seq[AstEdge] = Seq.empty[AstEdge]
+
+    for ((condition: String, ast: Ast) <- asts) {
+      val root: Option[NewNode] = ast.root
+
+      // Checks if the condition is satisfiable.
+      if (logicHandler.isSatisfiable(condition) && root.isDefined) {
+        val rootNode: AstNodeNew = root.get.asInstanceOf[AstNodeNew]
+        if (isJoernChoiceNode(rootNode)) {
+          // If the root Node is a choice node.
+          // Adds the presence conditions.
+          val subtreePresenceConditions: Seq[(String, String)] =
+            getPresenceConditions(rootNode.asInstanceOf[NewControlStructure])
+              .toSeq.sortBy((astId: String, condition: String) => astId)
+          for ((subtreeID: String, subtreeCondition: String) <- subtreePresenceConditions) {
+            val newCondition: String = logicHandler.combineAndSimplifyConditionsAnd(Seq(condition, subtreeCondition))
+            presenceConditionMap ++= Map(s"AST$conditionIndex" -> newCondition)
+            conditionIndex += 1
+          }
+
+          // Adds the new conditional edges
+          val adaptedPresenceConditionEdges: Seq[AstEdge] = ast.edges
+            .flatMap((edge: AstEdge) => if (edge.src == rootNode) Option(AstEdge(choiceNode, edge.dst)) else None).toSeq
+          presenceConditionEdges ++= adaptedPresenceConditionEdges
+
+          // Adds the code of the conditional subtrees (ASTs).
+          for (presenceConditionEdge: AstEdge <- adaptedPresenceConditionEdges) {
+            subtreeCodes ++= Seq(presenceConditionEdge.dst.asInstanceOf[AstNodeNew].code)
+          }
+
+          // Transfers all AST edges except for the outgoing root choice node edges.
+          subtreeNodes ++= ast.nodes.filter((node: NewNode) => node == rootNode)
+          subtreeEdges ++= ast.edges.filter((edge: AstEdge) => edge.src == rootNode)
+          subtreeConditionEdges ++= ast.conditionEdges.filter((edge: AstEdge) => edge.src == rootNode)
+          subtreeArgEdges ++= ast.argEdges.filter((edge: AstEdge) => edge.src == rootNode)
+          subtreeReceiverEdges ++= ast.receiverEdges.filter((edge: AstEdge) => edge.src == rootNode)
+          subtreeRefEdges ++= ast.refEdges.filter((edge: AstEdge) => edge.src == rootNode)
+          subtreeBindsEdges ++= ast.bindsEdges.filter((edge: AstEdge) => edge.src == rootNode)
+          subtreeCaptureEdges ++= ast.captureEdges.filter((edge: AstEdge) => edge.src == rootNode)
+        } else {
+          // If the root node is not a choice node.
+          // Adds the presence conditions.
+          presenceConditionMap ++= Map(s"AST$conditionIndex" -> condition)
+          conditionIndex += 1
+
+          // Adds the new conditional edges
+          presenceConditionEdges ++= Seq(AstEdge(choiceNode, ast.root.get))
+
+          // Adds the code of the AST.
+          subtreeCodes ++= Seq(rootNode.code)
+
+          // Transfers all AST edges of the subtree.
+          subtreeNodes ++= ast.nodes
+          subtreeEdges ++= ast.edges
+          subtreeConditionEdges ++= ast.conditionEdges
+          subtreeArgEdges ++= ast.argEdges
+          subtreeReceiverEdges ++= ast.receiverEdges
+          subtreeRefEdges ++= ast.refEdges
+          subtreeBindsEdges ++= ast.bindsEdges
+          subtreeCaptureEdges ++= ast.captureEdges
+        }
+      }
+    }
+
+    // Adds the presence conditions
+    val presenceConditionMapSerialized = presenceConditionMap.asJson.noSpaces
+    choiceNode.presenceCondition(presenceConditionMapSerialized)
+
+    // Adds the new Code to the root choice node.
+    val firstCondition: String = presenceConditionMap("AST1")
+    val otherConditionalSubtreeCode: String = subtreeCodes.tail.zipWithIndex.map((subtreeCode: String, astIndex: Int) => {
+      val subtreePresenceCondition: String = presenceConditionMap(s"AST${astIndex + 2}") // Access the current presence condition (presence condition IDs start by "AST1" and the first presence condition is treated differently)
+      s"#elif $subtreePresenceCondition\n$subtreeCode\n"
+    }).mkString
+    val code: String = s"#if $firstCondition\n${subtreeCodes.head}\n$otherConditionalSubtreeCode#endif"
+    choiceNode.code(code)
+
+    // Creates the conditional AST.
+    Ast(
+      nodes = Seq(choiceNode) ++ subtreeNodes,
+      edges = subtreeEdges ++ presenceConditionEdges,
+      conditionEdges = subtreeConditionEdges, // TODO: ++ presenceConditionEdges?
+      argEdges = subtreeArgEdges,
+      receiverEdges = subtreeReceiverEdges,
+      refEdges = subtreeRefEdges,
+      bindsEdges = subtreeBindsEdges,
+      captureEdges = subtreeCaptureEdges
+    )
+  }
+
+
   /**
    * Checks if the passed SuperC node is a conditional node.
    *
@@ -310,6 +438,9 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
 
   def getSecondJoernPresenceConditions(choiceNode: NewControlStructure): Option[String] =
     getPresenceConditions(choiceNode).get("AST2")
+
+  def getAllPresenceConditions(choiceNode: NewControlStructure): Seq[String] =
+    getPresenceConditions(choiceNode).map((subAstID: String, condition: String) => condition).toSeq
 
   def getFirstSuperCConditionalSubtree(node: Node): Node = {
     require(isSuperCConditionalNode(node),
@@ -372,7 +503,7 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
       case astsSeq if astsSeq.size == 1 => astsSeq.head
       case astsSeq =>
         val astsOfInterested: Seq[Ast] = astsSeq.filter(ast => ast.nodes.nonEmpty)
-        val sortedAstOfInterested: Seq[Ast] = sortAstsByCodPosition(astsOfInterested)
+        val sortedAstOfInterested: Seq[Ast] = sortAstsByCodePosition(astsOfInterested)
 
         // Determines the code position information.
         val firstBlockNode: NewNode = sortedAstOfInterested.head.root.get
@@ -402,7 +533,7 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
    * @param asts The ASTs that should be sorted by their first code position.
    * @return Returns the sorted ASTs as sequence.
    */
-  private def sortAstsByCodPosition(asts: Seq[Ast]): Seq[Ast] = asts.sortWith((ast1: Ast, ast2: Ast) => {
+  private def sortAstsByCodePosition(asts: Seq[Ast]): Seq[Ast] = asts.sortWith((ast1: Ast, ast2: Ast) => {
     // Extracts the position information.
     val position1: Option[(Int, Int)] = getFirstAstCodePosition(ast1)
     val position2: Option[(Int, Int)] = getFirstAstCodePosition(ast2)
@@ -516,7 +647,10 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
     // Combines and simplified the condition of the first sub AST.
     var firstSimplifiedCondition: String = logicHandler.combineAndSimplifyConditionsAnd(allParentConditions ++ Seq(firstCondition))
 
-    if (conditionalNode.size != FULL_CONDITIONAL_MACRO && !allParentConditions.isEmpty && logicHandler.equivalent(allParentConditions.last, firstSimplifiedCondition)) {
+    // Checks wehester the current condition is only a repetion of the parent condition.
+    if (conditionalNode.size != FULL_CONDITIONAL_MACRO && allParentConditions.nonEmpty
+      && logicHandler.equivalent(allParentConditions.last, firstSimplifiedCondition)) {
+      // If the current condition ist only a reptetiion of the parent condition.
       firstSimplifiedCondition = "1"
     }
 
@@ -539,7 +673,16 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
       firstConditionalSubtree = secondConditionalSubtree
       secondSimplifiedCondition = "0"
       secondConditionalSubtree = null
+
+    // Checks if the first and second AST contain the same AST.
+    } else if (sameSuperCAst(firstConditionalSubtree, secondConditionalSubtree)) {
+      // Combines the first and second condition.
+      firstSimplifiedCondition = logicHandler.combineAndSimplifyConditionsOr(
+        Seq(firstSimplifiedCondition, secondSimplifiedCondition))
+      secondSimplifiedCondition = "0"
+      secondConditionalSubtree = null
     }
+
     (firstSimplifiedCondition, firstConditionalSubtree, secondSimplifiedCondition, secondConditionalSubtree)
   }
 
@@ -759,7 +902,7 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
     })
 
     // Returns the generated sub ASTs in code order
-    sortAstsByCodPosition(subAsts)
+    sortAstsByCodePosition(subAsts)
   }
 
   private def groupSubAsts(asts: Seq[(String, Ast)]): Seq[(String, Ast)] = {
@@ -777,7 +920,7 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
         // Checks if the current AST exactly match an already checked AST, except for the root choice node.
         var notAssigned: Boolean = true
         for (index <- groupedSubAsts.indices) {
-          if (notAssigned && sameAst(ast, groupedSubAsts(index)(1))) {
+          if (notAssigned && sameJoernAst(ast, groupedSubAsts(index)(1))) {
             groupedSubAsts(index)(0) += logicString
             notAssigned = false
           }
@@ -804,19 +947,39 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
    * Compares the two given JOERN ASTs node-wise with all node parameters and child nodes, except for the root choice
    * node.
    *
-   * @param ast1 First AST to compare. It is expected that the root nocde is a choice node with only one child.
-   * @param ast2 Second AST to compare. It is expected that the root nocde is a choice node with only one child.
+   * @param ast1 The first JOERN AST to compare. It is expected that the root nocde is a choice node with only one child.
+   * @param ast2 The second JOERN AST to compare. It is expected that the root nocde is a choice node with only one child.
    * @return Returns `true` if the two given JOERN ASTs are the same, except for the root choice node, otherwise `false`
    *         is returned.
    */
-  private def sameAst(ast1: Ast, ast2: Ast): Boolean = {
+  private def sameJoernAst(ast1: Ast, ast2: Ast): Boolean = {
     // Extracts the normal root node (the first node that is not a choice node).
-    val root1: NewNode = getNormalRootNode(ast1)
-    val root2: NewNode = getNormalRootNode(ast2)    
+    val rootNode1: NewNode = getNormalRootNode(ast1)
+    val rootNode2: NewNode = getNormalRootNode(ast2)
 
+    // Compares the two ASTs.
+    sameJoernAst(rootNode1, ast1, rootNode2, ast2)
+  }
+
+  private def getNormalRootNode(ast: Ast): NewNode = ast.root.get match {
+    case choiceNode if isJoernChoiceNode(choiceNode) =>
+      ast.edges.filter((edge: AstEdge) => edge.src.equals(choiceNode)).head.dst // Assumes that the root choice node only contains one condition.
+    case normalNode => normalNode
+  }
+
+  /**
+   * Compares the two given JOERN ASTs node-wise with all node parameters and child nodes.
+   *
+   * @param rootNode1 The first JOERN AST root node to compare.
+   * @param ast1      The JOERN AST that contains the first JOERN AST root node.
+   * @param rootNode2 The second JOERN AST root node to compare.
+   * @param ast1      The JOERN AST that contains the second JOERN AST root node.
+   * @return Returns `true` if the two given JOERN ASTs are the same, otherwise `false` is returned.
+   */
+  private def sameJoernAst(rootNode1: NewNode, ast1: Ast, rootNode2: NewNode, ast2: Ast): Boolean = {
     // Iterates over both ASTs simultaneously and compares them node wise.
     var seemsEquals: Boolean = true
-    val pendingNodes: mutable.Stack[(NewNode, NewNode)] = mutable.Stack((root1, root2))
+    val pendingNodes: mutable.Stack[(NewNode, NewNode)] = mutable.Stack((rootNode1, rootNode2))
     while (seemsEquals && pendingNodes.nonEmpty) {
       val (node1: NewNode, node2: NewNode) = pendingNodes.pop
 
@@ -864,9 +1027,43 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
     seemsEquals
   }
 
-  private def getNormalRootNode(ast: Ast): NewNode = ast.root.get match {
-    case choiceNode if isJoernChoiceNode(choiceNode) =>
-      ast.edges.filter((edge: AstEdge) => edge.src.equals(choiceNode)).head.dst // Assumes that the root choice node only contains one condition.
-    case normalNode => normalNode
+  def sameSuperCAst(rootNode1: Node, rootNode2: Node): Boolean = {
+    // Iterates over both ASTs simultaneously and compares them node wise.
+    var seemsEquals: Boolean = true
+    val pendingNodes: mutable.Stack[(Any, Any)] = mutable.Stack((rootNode1, rootNode2))
+    while (seemsEquals && pendingNodes.nonEmpty) {
+      val (currentNode1, currentNode2) = pendingNodes.pop
+
+      // Checks if currentNode1 and currentNod2 are equals.
+      seemsEquals = (currentNode1, currentNode2) match {
+        case (node1, node2) if node1 == node2 => true // If node1 and node2 reference the same object instance.
+        case (node1, node2) if (node1 == null) || (node2 == null) => false // If only one node is null (implied by this and the previous condition).
+        case (node1, node2) if !node1.getClass.toString.equals(node2.getClass.toString) => false // If node1 and node2 have different class names.
+        case (node1, node2) if node1.isInstanceOf[PresenceCondition] => node1.toString.equals(node2.toString) // If bote nodes are PresenceCondition nodes.
+        case (node1, node2) if node1.isInstanceOf[String] => node1.equals(node2)
+        case (node1, node2) =>
+          val gNode1: GNode = node1.asInstanceOf[GNode]
+          val gNode2: GNode = node2.asInstanceOf[GNode]
+          if (!gNode1.getName.equals(gNode2.getName)) false // Checks if node1 and node2 have diffrend node names.
+          else if (!gNode1.properties().asScala.equals(gNode2.properties().asScala)) false // Checks if node1 and node2 have different properties
+          else if (gNode1.size != gNode2.size) false // Checks if node1 and node2 have the number of children.
+          else {
+            // Checks if the location information differ of node1 and node2.
+            val location1: Location = gNode1.getLocation
+            val location2: Location = gNode2.getLocation
+            val sameLocation: Boolean = (location1 == location2) && (if (location1 == null) true else {
+              location1.file.equals(location2.file) && location2.line.equals(location2.line) && location1.column.equals(location2.column)
+            })
+
+            // Adds all child nodes to the pending nodes.
+            for (childIndex: Int <- 0 until gNode1.size) {
+              pendingNodes.push((gNode1.get(childIndex), gNode2.get(childIndex)))
+            }
+
+            sameLocation
+          }
+      }
+    }
+    seemsEquals
   }
 }
