@@ -7,6 +7,7 @@ import io.joern.x2cpg.{Ast, AstEdge}
 import io.shiftleft.codepropertygraph.generated.ControlStructureTypes
 import io.shiftleft.codepropertygraph.generated.nodes.{AstNodeNew, NewBlock, NewControlStructure, NewNode}
 import superc.core.PresenceConditionManager.PresenceCondition
+import superc.core.Syntax
 import xtc.tree.{GNode, Location, Node}
 
 import scala.collection.JavaConverters.asScalaSetConverter
@@ -234,7 +235,7 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
 
     // Extracts conditions and subtrees. The first sub AST always contains a sub AST if the conditional SuperC node
     // contains at least one sub AST with a satisfiable condition.
-    val (firstCondition: String, firstConditionalSubtree: Node, secondCondition, secondConditionalSubtree) =
+    val (firstCondition: String, firstConditionalSubtree, secondCondition, secondConditionalSubtree) =
       extractConditionsAndSubtrees(conditionalNode, converterState)
 
     if (!logicHandler.isSatisfiable(firstCondition)) {
@@ -647,10 +648,10 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
     // Combines and simplified the condition of the first sub AST.
     var firstSimplifiedCondition: String = logicHandler.combineAndSimplifyConditionsAnd(allParentConditions ++ Seq(firstCondition))
 
-    // Checks wehester the current condition is only a repetion of the parent condition.
+    // Checks weather the current condition is only a repetition of the parent condition.
     if (conditionalNode.size != FULL_CONDITIONAL_MACRO && allParentConditions.nonEmpty
       && logicHandler.equivalent(allParentConditions.last, firstSimplifiedCondition)) {
-      // If the current condition ist only a reptetiion of the parent condition.
+      // If the current condition ist only a repetition of the parent condition.
       firstSimplifiedCondition = "1"
     }
 
@@ -1041,6 +1042,25 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
         case (node1, node2) if !node1.getClass.toString.equals(node2.getClass.toString) => false // If node1 and node2 have different class names.
         case (node1, node2) if node1.isInstanceOf[PresenceCondition] => node1.toString.equals(node2.toString) // If bote nodes are PresenceCondition nodes.
         case (node1, node2) if node1.isInstanceOf[String] => node1.equals(node2)
+        case (node1, node2) if node1.isInstanceOf[Syntax] =>
+          val syntaxNode1: Syntax = node1.asInstanceOf[Syntax]
+          val syntaxNode2: Syntax = node2.asInstanceOf[Syntax]
+          if (syntaxNode2.size != syntaxNode2.size) false // Checks if node1 and syntaxNode2 have the number of children.
+          else {
+            // Checks if the location information differ of node1 and syntaxNode2.
+            val location1: Location = syntaxNode2.getLocation
+            val location2: Location = syntaxNode2.getLocation
+            val sameLocation: Boolean = (location1 == location2) && (if (location1 == null) true else {
+              location1.file.equals(location2.file) && location2.line.equals(location2.line) && location1.column.equals(location2.column)
+            })
+
+            // Adds all child nodes to the pending nodes.
+            for (childIndex: Int <- 0 until syntaxNode1.size) {
+              pendingNodes.push((syntaxNode1.get(childIndex), syntaxNode2.get(childIndex)))
+            }
+
+            sameLocation
+          }
         case (node1, node2) =>
           val gNode1: GNode = node1.asInstanceOf[GNode]
           val gNode2: GNode = node2.asInstanceOf[GNode]

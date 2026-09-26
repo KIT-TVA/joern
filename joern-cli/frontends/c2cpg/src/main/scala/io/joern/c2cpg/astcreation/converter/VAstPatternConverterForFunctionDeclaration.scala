@@ -260,14 +260,14 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
                     val currentNode: Node = conditionalParameterNode.getNode(conditionalParameterIndex)
                     conditionalParameterAsts = conditionalParameterAsts
                       ++ conditionalHandler.handleAndSimplifyConditionalExtended(currentNode, parameterState,
-                                                                                 methodParameterExtractor)
+                                                                                 handleOneFunctionParameter)
                   }
                 }
                 conditionalParameterAsts
 
               } else {
                 // If the SuperC node is a "ParameterIdentifierDeclaration" node.
-                methodParameterExtractor(conditionalParameterNode, parameterState)
+                handleOneFunctionParameter(conditionalParameterNode, parameterState)
               }
             })
           conditionalParameterNodes = conditionalParameterNodes ++ newParameterNodes
@@ -381,26 +381,39 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
     (parameterNodes, parameterSignatureString, parameterNodeCode)
   }
 
-  private def extractVariableInformation(parameterNameNode: Node): (String, String) = {
-    parameterNameNode.getName match {
-      case nodeName if (nodeName.equals(SIMPLE_PARAMETER_DECLARATION)) => ("", parameterNameNode.getNode(0).getString(0))
-      case nodeName if (nodeName.equals(ARRAY_PARAMETER_DECLARATION)) =>
-        var nextArrayNode: Node = parameterNameNode.getNode(1)
-        var variableArrayInformation: String = ""
-        var isArrayNode: Boolean = true
-        while (isArrayNode) {
-          variableArrayInformation = (nextArrayNode.size  match {
-            case nChildren if (nChildren == 2) => s"[${nextArrayNode.getNode(1).getString(0)}]"
-            case nChildren if (nChildren == 1 && !nextArrayNode.getNode(0).getName.equals(ARRAY_DIMENSION_PARAMETER)) =>
-              s"[${nextArrayNode.getNode(0).getString(0)}]"
-            case _ => "[]"
-          }) + variableArrayInformation
-          if (nextArrayNode.size > 0 && nextArrayNode.getNode(0).getName.equals(ARRAY_DIMENSION_PARAMETER)) {
-            nextArrayNode = nextArrayNode.getNode(0)
-          } else isArrayNode = false
-        }
-        (variableArrayInformation, parameterNameNode.getNode(0).getNode(0).getString(0))
-    }
+  private def handleOneFunctionParameter(parameterIdentifierDeclarationNode: Node,
+                                         converterState: VAstConverterState): Seq[Ast] = {
+
+    // Selects the root parameter type node and the root parameter name node.
+    val parameterTypeRootNode: Node = parameterIdentifierDeclarationNode.getNode(0)
+    val parameterNameRootNode: Node = parameterIdentifierDeclarationNode.getNode(1)
+    
+    // Handles the parameter type.
+    conditionalHandler.handleAndSimplifyConditionalExtended(parameterTypeRootNode, converterState, (parameterTypeNode: Node, parameterTypeState: VAstConverterState) => {
+      variableHandler.handleVariableType(parameterTypeNode, parameterTypeState,
+        (parameterNameRootState: VAstConverterState, parameterType: String, line: Option[Int], column: Option[Int]) => {
+        handleParameterName(parameterNameRootNode, parameterNameRootState, parameterType, line, column,
+                            parameterIdentifierDeclarationNode)
+      })
+    })
+  }
+  
+  private def handleParameterName(parameterNameRootNode: Node, converterState: VAstConverterState, parameterType: String,
+                                  line: Option[Int], column: Option[Int],
+                                  parameterIdentifierDeclarationNode: Node): Seq[Ast] = {
+
+    val parameterCreator: (Node, VAstConverterState, String, String, String) => Seq[Ast] =
+      (nameNode: Node, nameNodeState: VAstConverterState, fullParameterType: String, parameterName: String, code: String) => {
+        // The parameter index for each parameter Nod is set after all parameter nodes are translated and in the
+        // right order because in some conditional situations the parameters in the SuperC AST may not in order.
+        val parameterNode: NewMethodParameterIn = vAstCreator.parameterInNodeHelper(parameterIdentifierDeclarationNode, parameterName, code,
+          -1, false, "BY_VALUE", fullParameterType, dynamicTypeHintFullName=Seq(), line=line, column=column)
+        Seq(vAstCreator.AstHelper(parameterNode))
+      }
+    
+    conditionalHandler.handleAndSimplifyConditionalExtended(parameterNameRootNode, converterState, (parameterNameNode: Node, parameterNameState: VAstConverterState) => {
+      variableHandler.handleDeclaration(parameterNameNode, parameterType, parameterNameState, parameterCreator)
+    })
   }
 
   private def combinedConditionSatisfiable(conditions: String, parameterCondition: String): Boolean = {

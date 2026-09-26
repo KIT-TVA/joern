@@ -19,6 +19,8 @@ class VAstPatternConverterForSuperCRoot(vAstCreator: VAstCreatorNew, converter: 
   private val globaleFileMethodeLine: Int = 1
   private val globaleFileMethodeColumn: Int = 1
 
+  private val conditionalHandler: VAstConditionalHandler = converter.getConditionalHandler
+
   override def convert(superCVAst: Node, converterState: VAstConverterState): Option[Seq[Ast]] = {
     if (superCVAst.size() != 1)
       throw new RuntimeException("The structure of the SuperC VAST root does not match the expected structure.")
@@ -31,7 +33,11 @@ class VAstPatternConverterForSuperCRoot(vAstCreator: VAstCreatorNew, converter: 
     val definitions: ListBuffer[Ast] =  new ListBuffer[Ast]()
     val globalCodeBlockStatements: ListBuffer[Ast] = new ListBuffer[Ast]()
     for (index: Int <- 0 until externalDeclarationListNode.size) {
-      val astSubtrees: Seq[Ast] = converter.convert(externalDeclarationListNode.getNode(index), converterState)
+      val astSubtrees: Seq[Ast] = conditionalHandler.handleAndSimplifyConditionalExtended(
+        externalDeclarationListNode.getNode(index),
+        converterState,
+        (node: Node, state: VAstConverterState) => converter.convert(node, state)
+      )
 
       if (astSubtrees.isEmpty) {
         val error: String = "At least one element was expected at the top level, but  no elements were returned."

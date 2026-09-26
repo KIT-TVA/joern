@@ -3,6 +3,7 @@ package io.joern.c2cpg.astcreation.converter
 import io.joern.c2cpg.astcreation.{Defines, VAstCreatorNew}
 import io.joern.x2cpg.Ast
 import io.shiftleft.codepropertygraph.generated.nodes.NewIdentifier
+import superc.core.Syntax
 import xtc.tree.{Location, Node}
 
 import scala.collection.mutable
@@ -31,6 +32,157 @@ class VAstVariableHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
    * @return Retruens the intial variable scope data structure with the already defined global variable scope.
    */
   override def getInitialConverterState: Any = Seq(mutable.Map.empty[String,mutable.Map[String, String]])
+
+  /**
+   * Handles the extraction of the function parameter type or variable type extraction and pass the annotated type information to the handle method together with the logcation information and the type root node
+   * 
+   * Important:
+   * This Method calls the provided handler methode for each conditional annotated type seperatly.
+   * 
+   * @param rootTypeNode
+   * @param converterState
+   * @param handler
+   * @return
+   */
+  def handleVariableType(rootTypeNode: Node, converterState: VAstConverterState,
+                         handler: (VAstConverterState, String, Option[Int], Option[Int]) => Seq[Ast]): Seq[Ast] = {
+
+    conditionalHandler.handleAndSimplifyConditionalExtended(rootTypeNode, converterState, (typeNode: Node, state: VAstConverterState) => {
+      if (typeNode.isInstanceOf[Syntax]) {
+        // If the type is only a simple data type (e.g. int, float, ...) without annotation (e.g. const, unsigned, ...)
+        val (line: Option[Int], column: Option[Int]) = getLocation(typeNode)
+        val parameterType: String = typeNode.getString(0)
+
+        // Calls the provide handler with the parameter/variable type and the corresponding location information.
+        handler(state, parameterType, line, column)
+
+      } else {
+        // If the type is a struct, an enum or an annotated type.
+        handleComplexType(typeNode, state, handler)
+      }
+    })
+  }
+
+  private def handleComplexType(typeSpecifierNode: Node, converterState: VAstConverterState,
+                                handler: (VAstConverterState, String, Option[Int], Option[Int]) => Seq[Ast]): Seq[Ast] = {
+    typeSpecifierNode.getName match {
+      case annotationRoot if annotationRoot.equals("BasicTypeSpecifier")
+            || annotationRoot.equals("BasicDeclarationSpecifier") =>
+        // If it is a simple type with a const annotation.
+        val annotationRootNode: Node = typeSpecifierNode.getNode(0)
+        val parameterTypeRootNode: Node = typeSpecifierNode.getNode(1)
+        // Handles the simple parameter type.
+        conditionalHandler.handleAndSimplifyConditionalExtended(parameterTypeRootNode, converterState,
+                                                                (parameterTypeNode: Node, parameterTypeState: VAstConverterState) => {
+          // Determines the simple parameter/variable type (e.g. "int", "float").
+          val parameterType: String = parameterTypeNode.getString(0)
+
+          // Handle the type annotation.
+          conditionalHandler.handleAndSimplifyConditionalExtended(annotationRootNode, parameterTypeState,
+                                                                  (annotationNode: Node, annotationState: VAstConverterState) => {
+            handleTypeAnnotation(annotationNode, annotationState, handler, parameterType)
+          })
+        })
+
+      case structOrEnumRoot if structOrEnumRoot.equals("SUETypeSpecifier")
+            || structOrEnumRoot.equals("SUEDeclarationSpecifier") =>
+        // If the type is a struct or an enum
+        if (typeSpecifierNode.size == 1) {
+          // If ghe type is a simple struct or an enum.
+          val structOrEnumRootNode: Node = typeSpecifierNode.getNode(0)
+          conditionalHandler.handleAndSimplifyConditionalExtended(structOrEnumRootNode, converterState,
+                                                                  (typeRootNode: Node, typeState: VAstConverterState) => {
+            handleStructAndEnumType(typeRootNode, typeState, handler)
+          })
+
+        } else {
+          // If the type is a struct or an enum with an additional type annotation.
+          val annotationNode: Node = typeSpecifierNode.getNode(0)
+          val structOrEnumRootNode: Node = typeSpecifierNode.getNode(1)
+          conditionalHandler.handleAndSimplifyConditionalExtended(structOrEnumRootNode, converterState,
+                                                                  (typeRootNode: Node, typeState: VAstConverterState) => {
+            // Handles the struct or enum type.
+            handleStructAndEnumType(typeRootNode, typeState, (state: VAstConverterState, parameterType: String, line: Option[Int], column: Option[Int]) => {
+              // Handles the type annotation.
+              conditionalHandler.handleAndSimplifyConditionalExtended(annotationNode, state,
+                (node: Node, annotationState: VAstConverterState) => {
+                  handleTypeAnnotation(node, annotationState, handler, parameterType)
+                })
+            })
+          })
+        }
+    }
+  }
+
+  private def handleStructAndEnumType(typeSpecifierNode: Node, converterState: VAstConverterState,
+                                      handler: (VAstConverterState, String, Option[Int], Option[Int]) => Seq[Ast]): Seq[Ast] = {
+    val dataTypeAnnotationNode: Node = typeSpecifierNode.getNode(0)
+    val dataTypeNameRootNode: Node = typeSpecifierNode.getNode(1)
+
+    // Determines the data type annotation and the code position.
+    val dataTypeAnnotation: String = dataTypeAnnotationNode.getString(0)
+    val (line: Option[Int], column: Option[Int]) = getLocation(dataTypeAnnotationNode)
+
+    // Handles the data type name.
+    conditionalHandler.handleAndSimplifyConditionalExtended(dataTypeNameRootNode, converterState,
+                                                            (dataTypeNameNode: Node, dataTypeNameState: VAstConverterState) => {
+      // Creates the type name.
+      val dataTypeName: String = dataTypeNameNode.getNode(0).getString(0)
+      val parameterType: String = dataTypeAnnotation + " " + dataTypeName
+
+      handler(dataTypeNameState, parameterType, line, column)
+    })
+  }
+
+  private def handleTypeAnnotation(typeAnnotationNode: Node, converterState: VAstConverterState,
+                                   handler: (VAstConverterState, String, Option[Int], Option[Int]) => Seq[Ast],
+                                   parameterType: String): Seq[Ast] = {
+    // Selects the node with the annotation information
+    val annotations: Node | Seq[Ast] = typeAnnotationNode match {
+      case annotationNode: Syntax => annotationNode // If it is a type annotation e.g. "unsigned" or "signed".
+      case constRootNode if constRootNode.getName.equals("TypeQualifierList") =>
+        // If the type is marked as constant.
+        // The conditional node duplicates the parent condition, so this conditional can be skipped.
+        conditionalHandler.getFirstSuperCConditionalSubtree(constRootNode.getNode(0)).getNode(0).getNode(0)
+
+      case externRootNode if externRootNode.getName.equals("DeclarationQualifierList") =>
+        // If the type is marked as extern.
+        // The conditional node duplicates the parent condition, so this conditional can be skipped.
+        conditionalHandler.getFirstSuperCConditionalSubtree(externRootNode.getNode(0))
+
+      case rootAnnotationNode if rootAnnotationNode.getName.equals("BasicTypeSpecifier")
+            || rootAnnotationNode.getName.equals("BasicDeclarationSpecifier") =>
+        // If the type annotation consists of multiple annotation instructions, such as “const unsigned”.
+        // Handles the second/last annotation instruction.
+        conditionalHandler.handleAndSimplifyConditionalExtended(rootAnnotationNode.getNode(1), converterState,
+                                                                (annotationInstructionNode: Node, annotationInstructionState: VAstConverterState) => {
+          // Extends the parameter/variable type by the second/last annotation.
+          val secondTypeAnnotation: String = annotationInstructionNode.getString(0)
+          val annotatedParameterType: String = secondTypeAnnotation + " " + parameterType
+
+          // Handles the first/previus annotation instruction.
+          conditionalHandler.handleAndSimplifyConditionalExtended(rootAnnotationNode.getNode(0), annotationInstructionState,
+                                                                  (node: Node, state: VAstConverterState) => {
+            handleTypeAnnotation(node, state, handler, annotatedParameterType)
+          })
+        })
+    }
+
+    annotations match {
+      case annotationNode: Node =>
+        // If an annotation SuperC node is returned.
+        // creates the parameter/variable type information and determines the location information.
+        val annotatedParameterType: String = annotationNode.getString(0) + " " + parameterType
+        val (line: Option[Int], column: Option[Int]) = getLocation(annotationNode)
+
+        // Calls the passed handler with the determined type and location information.
+        handler(converterState, annotatedParameterType, line, column)
+
+      case _ =>
+        // If an JOERN AST sequence is returned with already transformed parameter/variable declarations.
+        annotations.asInstanceOf[Seq[Ast]]
+    }
+  }
 
   /**
    *
