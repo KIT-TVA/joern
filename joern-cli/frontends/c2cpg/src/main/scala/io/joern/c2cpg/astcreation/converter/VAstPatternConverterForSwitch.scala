@@ -26,7 +26,7 @@ class VAstPatternConverterForSwitch(vAstCreator: VAstCreatorNew, converter: VAst
       "DefaultLabeledStatement"
     )
   ) {
-  
+
   private val conditionalHandler: VAstConditionalHandler = converter.getConditionalHandler
 
   override def convert(superCVAst: Node, converterState: VAstConverterState): Option[Seq[Ast]] = {
@@ -67,13 +67,45 @@ class VAstPatternConverterForSwitch(vAstCreator: VAstCreatorNew, converter: VAst
 
   /** JUMP_TARGET("case") + LITERAL/IDENT for the case value + nested statement. */
   private def convertCase(caseNode: Node, converterState: VAstConverterState): Seq[Ast] = {
+    conditionalCaseValueNode(caseNode) match {
+      case Some(cond) =>
+        // CHOICE on label / JUMP_TARGET; keep helper/break outside the CHOICE.
+        val labelAsts = conditionalHandler.handleConditional(
+          cond,
+          converterState,
+          (resolvedValue, state) => convertCaseLabelOnly(caseNode, textOf(resolvedValue))
+        )
+        labelAsts ++ nestedStmt(caseNode, converterState)
+      case None =>
+        convertCaseWithValue(caseNode, caseValue(caseNode), converterState)
+    }
+  }
+
+  private def convertCaseLabelOnly(caseNode: Node, value: Option[String]): Seq[Ast] = {
     val (line, column) = locationOf(caseNode)
-    val value          = caseValue(caseNode)
     val exprAst        = value.map(v => leafAst(v, line, column))
     val code           = value.map(v => s"case $v:").getOrElse("case:")
     val jump =
       vAstCreator.AstHelper(vAstCreator.jumpTargetNodeHelper(caseNode, "case", code, line, column))
-    Seq(jump) ++ exprAst.toSeq ++ nestedStmt(caseNode, converterState)
+    Seq(jump) ++ exprAst.toSeq
+  }
+
+  private def convertCaseWithValue(
+                                    caseNode: Node,
+                                    value: Option[String],
+                                    converterState: VAstConverterState
+                                  ): Seq[Ast] =
+    convertCaseLabelOnly(caseNode, value) ++ nestedStmt(caseNode, converterState)
+
+  /** Real `#ifdef` on the case label value (not Conditional("1", …)). */
+  private def conditionalCaseValueNode(caseNode: Node): Option[Node] = {
+    val start = if (keywordAt(caseNode, 0).contains("case")) 1 else 0
+    (start until caseNode.size()).view
+      .flatMap(i => safeNodeAt(caseNode, i))
+      .find { n =>
+        conditionalHandler.isSuperCConditionalNode(n) &&
+          conditionalHandler.getFirstSuperCCondition(n) != "1"
+      }
   }
 
   private def convertDefault(defaultNode: Node, converterState: VAstConverterState): Seq[Ast] = {
@@ -156,8 +188,18 @@ class VAstPatternConverterForSwitch(vAstCreator: VAstCreatorNew, converter: VAst
   }
 
   private def convertExpr(node: Node, converterState: VAstConverterState): Ast = {
-    if (conditionalHandler.isSuperCConditionalNode(node) && conditionalHandler.getFirstSuperCCondition(node) == "1") {
-      convertExpr(conditionalHandler.getFirstSuperCConditionalSubtree(node), converterState)
+    if (conditionalHandler.isSuperCConditionalNode(node)) {
+      if (conditionalHandler.getFirstSuperCCondition(node) == "1") {
+        convertExpr(conditionalHandler.getFirstSuperCConditionalSubtree(node), converterState)
+      } else {
+        // Do not fall back to textOf(Conditional) — that collapses `#ifdef` to one IDENTIFIER.
+        val asts = conditionalHandler.handleConditional(
+          node,
+          converterState,
+          (child, state) => Seq(convertExpr(child, state))
+        )
+        asts.find(a => a.root.isDefined && !isDummy(a)).getOrElse(vAstCreator.AstHelper())
+      }
     } else {
       val converted = converter.convert(node, converterState)
       if (converted.nonEmpty && converted.head.root.isDefined && !isDummy(converted.head)) converted.head
@@ -182,12 +224,21 @@ class VAstPatternConverterForSwitch(vAstCreator: VAstCreatorNew, converter: VAst
   private def textOf(node: Node): Option[String] = {
     val direct = firstStringChild(node)
     if (direct.nonEmpty) Some(direct)
-    else {
-      val s = node.toString
-      Seq("""\["([^"]+)"\]""".r, """\("([^"]+)"\)""".r).view
-        .flatMap(_.findFirstMatchIn(s).map(_.group(1)))
-        .headOption
+    else extractQuotedName(node.toString)
+  }
+
+  /** Avoid RegExp escapes that break on newer JDKs (`\]` etc.). */
+  private def extractQuotedName(text: String): Option[String] = {
+    def between(open: String, close: String): Option[String] = {
+      val i = text.indexOf(open)
+      if (i < 0) None
+      else {
+        val start = i + open.length
+        val j     = text.indexOf(close, start)
+        if (j <= start) None else Option(text.substring(start, j)).filter(_.nonEmpty)
+      }
     }
+    between("[\"", "\"]").orElse(between("(\"", "\")"))
   }
 
   private def firstStringChild(node: Node): String = {

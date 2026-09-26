@@ -25,6 +25,8 @@ class VAstPatternConverterForBinaryOperators(vAstCreator: VAstCreatorNew, conver
     )
   ) {
 
+  private val conditionalHandler = converter.getConditionalHandler
+
   private val OperatorMap: Map[String, String] = Map(
     "*"   -> Operators.multiplication,
     "/"   -> Operators.division,
@@ -78,14 +80,32 @@ class VAstPatternConverterForBinaryOperators(vAstCreator: VAstCreatorNew, conver
     }
   }
 
+  /**
+   * Like FunctionCall arguments: `#ifdef` operands must become CHOICE, not a single
+   * identifier taken from the first branch (e.g. `ifdef USE_X x #else y` in `x > 0`).
+   */
   private def parameterConverter(node: Node, converterState: VAstConverterState): Ast = {
-    val converted = converter.convert(node, converterState)
-    if (converted.nonEmpty && converted.head.root.isDefined) converted.head
-    else node.getName match {
-      case "PrimaryIdentifier"       => identifierAst(node)
-      case "superc.core.Syntax$Text" => literalAst(node)
-      case _ if node.size() == 1     => parameterConverter(node.getNode(0), converterState)
-      case _                         => vAstCreator.AstHelper()
+    if (conditionalHandler.isSuperCConditionalNode(node)) {
+      if (conditionalHandler.getFirstSuperCCondition(node) == "1") {
+        parameterConverter(conditionalHandler.getFirstSuperCConditionalSubtree(node), converterState)
+      } else {
+        val asts = conditionalHandler.handleConditional(
+          node,
+          converterState,
+          (child, state) => Seq(parameterConverter(child, state))
+        )
+        asts.find(a => a.root.isDefined).getOrElse(vAstCreator.AstHelper())
+      }
+    } else {
+      val converted = converter.convert(node, converterState)
+      if (converted.nonEmpty && converted.head.root.isDefined) converted.head
+      else
+        node.getName match {
+          case "PrimaryIdentifier"       => identifierAst(node)
+          case "superc.core.Syntax$Text" => literalAst(node)
+          case _ if node.size() == 1     => parameterConverter(node.getNode(0), converterState)
+          case _                         => vAstCreator.AstHelper()
+        }
     }
   }
 

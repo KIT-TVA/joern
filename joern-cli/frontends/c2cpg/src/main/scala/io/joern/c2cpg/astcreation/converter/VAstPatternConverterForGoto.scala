@@ -128,12 +128,22 @@ class VAstPatternConverterForGoto(vAstCreator: VAstCreatorNew, converter: VAstCo
 
   /** From `...Syntax$Text["done"]...` or `Text("done")`. */
   private def extractQuotedName(text: String): Option[String] = {
-    val patterns = Seq(
-      """\["([A-Za-z_][A-Za-z0-9_]*)"\]""".r,
-      """\('([A-Za-z_][A-Za-z0-9_]*)'\)""".r,
-      """Text\["([A-Za-z_][A-Za-z0-9_]*)"\]""".r
-    )
-    patterns.view.flatMap(_.findFirstMatchIn(text).map(_.group(1))).headOption
+    def between(open: String, close: String): Option[String] = {
+      val i = text.indexOf(open)
+      if (i < 0) None
+      else {
+        val start = i + open.length
+        val j     = text.indexOf(close, start)
+        if (j <= start) None
+        else {
+          val v = text.substring(start, j)
+          if (v.nonEmpty && v.forall(c => c.isLetterOrDigit || c == '_')) Some(v) else None
+        }
+      }
+    }
+    between("[\"", "\"]")
+      .orElse(between("('", "')"))
+      .orElse(between("Text[\"", "\"]"))
   }
 
   private def firstString(node: Node): Option[String] =

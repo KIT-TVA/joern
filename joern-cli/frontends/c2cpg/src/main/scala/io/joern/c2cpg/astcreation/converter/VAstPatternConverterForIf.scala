@@ -67,7 +67,7 @@ class VAstPatternConverterForIf(vAstCreator: VAstCreatorNew, converter: VAstConv
   private def convertBody(bodyNode: Node, converterState: VAstConverterState): Ast =
     if (bodyNode.getName == "CompoundStatement" && bodyNode.size() >= 2) {
       val stmtAsts = getChildren(bodyNode.getNode(1)).flatMap { child =>
-        converter.convert(child, converterState)
+        convertStmt(child, converterState)
       }
       val (line, column) = locationOf(bodyNode)
       val code           = stmtAsts.map(astCode).filter(_.nonEmpty).mkString("\n")
@@ -80,12 +80,42 @@ class VAstPatternConverterForIf(vAstCreator: VAstCreatorNew, converter: VAstConv
       )
       vAstCreator.blockAstHelper(block, stmtAsts.toList)
     } else {
-      converter.getConditionalHandler.handleConditional(bodyNode, converterState, (node: Node, state: VAstConverterState) => Seq(convertBody(node, state))).head
-      // converter.convert(bodyNode, converterState).headOption.getOrElse(vAstCreator.AstHelper())
+      convertStmt(bodyNode, converterState).headOption.getOrElse(vAstCreator.AstHelper())
     }
 
-  private def convertSubtree(node: Node, converterState: VAstConverterState): Ast =
-    converter.convert(node, converterState).headOption.getOrElse(vAstCreator.AstHelper())
+  /** Unwrap Conditional("1"); real `#ifdef` → CHOICE (same pattern as Switch / FunctionCall). */
+  private def convertStmt(node: Node, converterState: VAstConverterState): Seq[Ast] = {
+    val conditionalHandler = converter.getConditionalHandler
+    if (conditionalHandler.isSuperCConditionalNode(node)) {
+      if (conditionalHandler.getFirstSuperCCondition(node) == "1") {
+        convertStmt(conditionalHandler.getFirstSuperCConditionalSubtree(node), converterState)
+      } else {
+        conditionalHandler.handleConditional(node, converterState, (n, s) => convertStmt(n, s))
+      }
+    } else if (node.getName == "CompoundStatement") {
+      Seq(convertBody(node, converterState))
+    } else {
+      converter.convert(node, converterState)
+    }
+  }
+
+  private def convertSubtree(node: Node, converterState: VAstConverterState): Ast = {
+    val conditionalHandler = converter.getConditionalHandler
+    if (conditionalHandler.isSuperCConditionalNode(node)) {
+      if (conditionalHandler.getFirstSuperCCondition(node) == "1") {
+        convertSubtree(conditionalHandler.getFirstSuperCConditionalSubtree(node), converterState)
+      } else {
+        val asts = conditionalHandler.handleConditional(
+          node,
+          converterState,
+          (n, s) => Seq(convertSubtree(n, s))
+        )
+        asts.find(_.root.isDefined).getOrElse(vAstCreator.AstHelper())
+      }
+    } else {
+      converter.convert(node, converterState).headOption.getOrElse(vAstCreator.AstHelper())
+    }
+  }
 
   private def keywordAt(node: Node, index: Int): String =
     if (index >= node.size()) ""

@@ -128,12 +128,20 @@ class VAstPatternConverterForEnum(vAstCreator: VAstCreatorNew, converter: VAstCo
   private def textOf(node: Node): Option[String] = {
     val direct = firstStringChild(node)
     if (direct.nonEmpty) Some(direct)
-    else {
-      val s = node.toString
-      Seq("""\["([^"]+)"\]""".r, """\("([^"]+)"\)""".r).view
-        .flatMap(_.findFirstMatchIn(s).map(_.group(1)))
-        .headOption
+    else extractQuotedName(node.toString)
+  }
+
+  private def extractQuotedName(text: String): Option[String] = {
+    def between(open: String, close: String): Option[String] = {
+      val i = text.indexOf(open)
+      if (i < 0) None
+      else {
+        val start = i + open.length
+        val j     = text.indexOf(close, start)
+        if (j <= start) None else Option(text.substring(start, j)).filter(_.nonEmpty)
+      }
     }
+    between("[\"", "\"]").orElse(between("(\"", "\")"))
   }
 
   private def firstStringChild(node: Node): String = {
