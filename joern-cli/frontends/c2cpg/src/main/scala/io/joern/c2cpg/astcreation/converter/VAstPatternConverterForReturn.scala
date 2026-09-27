@@ -53,7 +53,7 @@ class VAstPatternConverterForReturn(vAstCreator: VAstCreatorNew, converter: VAst
       val returnContentNode: Node = returnNode.getNode(0)
       returnContentNode.getName match {
         case "ExpressionOpt" => vAstCreator.AstHelper()
-        case "PrimaryIdentifier" => variableAst(returnContentNode)
+        case "PrimaryIdentifier" => converter.convert(returnContentNode, converterState).head
         case name if name.startsWith("superc.core.Syntax$") => constantAst(returnContentNode)
         case name if conditionalHandler.isSuperCConditionalNode(returnContentNode) =>
           conditionalHandler.handleConditional(returnContentNode, converterState, (node: Node, state: VAstConverterState) => {
@@ -65,21 +65,6 @@ class VAstPatternConverterForReturn(vAstCreator: VAstCreatorNew, converter: VAst
           if (subasts.isEmpty) vAstCreator.AstHelper() else subasts.head
       }
     } else vAstCreator.AstHelper()
-  }
-
-  private def variableAst(variableNode: Node): Ast = {
-    val variableNameNode: Node = variableNode.getNode(0)
-    val variableName = variableNameNode.getString(0)
-    val (line, column) = getLocation(variableNameNode)
-    
-    // Creates the variable node.
-    val variableIdentifyerNode = NewIdentifier()
-      .name(variableName)
-      .code(variableName)
-      .typeFullName(Defines.Any) // Tht variable type can be determined but this is not strait forward because the variable type can be depended on conditional macros. The possible variable types are given by the conditional dependencies of the return statements and the variable declaration.
-      .lineNumber(line)
-      .columnNumber(column)
-    vAstCreator.AstHelper(variableIdentifyerNode)
   }
 
   private def constantAst(constantNode: Node): Ast = {

@@ -134,7 +134,7 @@ class VAstPatternConverterForFunctionCall(vAstCreator: VAstCreatorNew, converter
       converted.head
     } else {
       node.getName match {
-        case "PrimaryIdentifier"                  => identifierAst(node)
+        case "PrimaryIdentifier"                  => converter.convert(node, converterState).head
         case "superc.core.Syntax$Text"            => identifierAstFromText(node)
         case name if name.contains("Syntax$Text") => identifierAstFromText(node)
         case _ if node.size() >= 1 =>
@@ -153,11 +153,6 @@ class VAstPatternConverterForFunctionCall(vAstCreator: VAstCreatorNew, converter
       codeFromProperty(props.get("CODE")).exists(_.contains("dummy block")) ||
         codeFromProperty(props.get("TYPE_FULL_NAME")).exists(_.contains("dummy block"))
     }
-
-  private def identifierAst(node: Node): Ast = {
-    val name = firstStringChild(node)
-    identifierAstFromName(node, name)
-  }
 
   private def identifierAstFromText(node: Node): Ast = {
     identifierAstFromName(node, firstStringChild(node))

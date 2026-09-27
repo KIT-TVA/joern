@@ -137,7 +137,7 @@ class VAstPatternConverterForUnaryOperators(vAstCreator: VAstCreatorNew, convert
     val converted = converter.convert(node, converterState)
     if (converted.nonEmpty && converted.head.root.isDefined) converted.head
     else node.getName match {
-      case "PrimaryIdentifier"       => identifierAst(node)
+      case "PrimaryIdentifier"       => converter.convert(node, converterState).head
       case "superc.core.Syntax$Text" => literalAst(node)
       case _ if node.size() == 1 =>
         node.get(0) match {
@@ -146,18 +146,6 @@ class VAstPatternConverterForUnaryOperators(vAstCreator: VAstCreatorNew, convert
         }
       case _ => vAstCreator.AstHelper()
     }
-  }
-
-  private def identifierAst(node: Node): Ast = {
-    val name = firstStringChild(node)
-    val (line, column) = locationOf(node)
-    val id = NewIdentifier()
-      .name(name)
-      .code(name)
-      .typeFullName(Defines.Any)
-      .lineNumber(line)
-      .columnNumber(column)
-    vAstCreator.AstHelper(id)
   }
 
   private def literalAst(node: Node): Ast = {

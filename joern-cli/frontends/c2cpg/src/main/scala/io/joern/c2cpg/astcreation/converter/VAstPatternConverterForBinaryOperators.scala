@@ -101,24 +101,12 @@ class VAstPatternConverterForBinaryOperators(vAstCreator: VAstCreatorNew, conver
       if (converted.nonEmpty && converted.head.root.isDefined) converted.head
       else
         node.getName match {
-          case "PrimaryIdentifier"       => identifierAst(node)
+          case "PrimaryIdentifier"       => converter.convert(node, converterState).head
           case "superc.core.Syntax$Text" => literalAst(node)
           case _ if node.size() == 1     => parameterConverter(node.getNode(0), converterState)
           case _                         => vAstCreator.AstHelper()
         }
     }
-  }
-
-  private def identifierAst(node: Node): Ast = {
-    val nameNode = node.getNode(0)
-    val (line, column) = locationOf(node)
-    val id = NewIdentifier()
-      .name(nameNode.getString(0))
-      .code(nameNode.getString(0))
-      .typeFullName(nameNode.getName)
-      .lineNumber(line)
-      .columnNumber(column)
-    vAstCreator.AstHelper(id)
   }
 
   private def literalAst(node: Node): Ast = {
