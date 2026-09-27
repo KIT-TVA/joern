@@ -211,33 +211,6 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
     val parameterTypeListNode: Node = functionPropertyRootNode.getNode(1).getNode(1).getNode(0)
     var parameterNodes: Seq[Ast] = Seq.empty[Ast]
     if (parameterTypeListNode.size > 0) { // Checks if the current method does have parameters
-      // Defines the handler/method parameter extractor.
-      val methodParameterExtractor: (Node, VAstConverterState) => Seq[Ast] = (node: Node, extractorState: VAstConverterState) => {
-
-        // Defines the handler/method to create the all JOERN method parameter nodes.
-        val parameterNameRootNode: Node = node.getNode(1)
-        val methodParameterCreator: (Node, VAstConverterState) => Seq[Ast] = (parameterTypeNode: Node, state: VAstConverterState) => {
-          val parameterType: String = parameterTypeNode.getString(0)
-          val location: Location = parameterTypeNode.getLocation
-          val (line: Option[Int], column: Option[Int]) =
-            if (location == null) (None, None) else (Option(location.line), Option(location.column))
-
-          // Creates each JOERN method parameter node.
-          variableHandler.handleDeclaration(parameterNameRootNode, parameterType, state,
-            (nameNode: Node, s: VAstConverterState, fullParameterType: String, parameterName: String, code: String) => {
-              // The parameter index for each parameter Nod is set after all parameter nodes are translated and in the
-              // right order because in some conditional situations the parameters in the SuperC AST may not in order.
-              val parameterNode: NewMethodParameterIn = vAstCreator.parameterInNodeHelper(node, parameterName, code,
-                -1, false, "BY_VALUE", fullParameterType, dynamicTypeHintFullName = Seq(), line = line, column = column)
-              Seq(vAstCreator.AstHelper(parameterNode))
-            })
-        }
-
-        val parameterTypeRootNode: Node = node.getNode(0)
-        if (conditionalHandler.isSuperCConditionalNode(parameterTypeRootNode)) {
-          conditionalHandler.handleAndSimplifyConditional(parameterTypeRootNode, extractorState, methodParameterCreator)
-        } else methodParameterCreator(parameterTypeRootNode, extractorState)
-      }
 
       // Extracts all method parameter.
       parameterNodes = conditionalHandler.handleAndSimplifyConditionalExtended(parameterTypeListNode, converterState,
@@ -402,8 +375,8 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
                                   line: Option[Int], column: Option[Int],
                                   parameterIdentifierDeclarationNode: Node): Seq[Ast] = {
 
-    val parameterCreator: (Node, VAstConverterState, String, String, String) => Seq[Ast] =
-      (nameNode: Node, nameNodeState: VAstConverterState, fullParameterType: String, parameterName: String, code: String) => {
+    val parameterCreator: (Node, VAstConverterState, Node, String, String, String) => Seq[Ast] =
+      (nameRootNode: Node, nameNodeState: VAstConverterState, nameNode: Node, fullParameterType: String, parameterName: String, code: String) => {
         // The parameter index for each parameter Nod is set after all parameter nodes are translated and in the
         // right order because in some conditional situations the parameters in the SuperC AST may not in order.
         val parameterNode: NewMethodParameterIn = vAstCreator.parameterInNodeHelper(parameterIdentifierDeclarationNode, parameterName, code,

@@ -936,7 +936,7 @@ class VAstConditionalHandler(vAstCreator: VAstCreatorNew, converter: VAstConvert
       // Simplify conditional logic expression of the grouped Subtrees with.
       val logicHandler: VAstLogicHandler = converter.getLogicHandler
       groupedSubAsts.map((logicString: ListBuffer[String], ast: Ast) => {
-        println(s"logic string: \"$logicString\"")
+        // println(s"logic string: \"$logicString\"")
 
         val simplifiedCombinedExpression: String  = logicHandler.combineAndSimplifyConditionsOr(logicString.toSeq)
         (simplifiedCombinedExpression, ast)

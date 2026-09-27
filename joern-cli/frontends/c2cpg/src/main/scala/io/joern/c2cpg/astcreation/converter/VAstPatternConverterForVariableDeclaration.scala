@@ -24,19 +24,19 @@ class VAstPatternConverterForVariableDeclaration(vAstCreator: VAstCreatorNew, co
 
   private val FIRST_DECLARATION_NODE_NODE_SIZE: Int = 5
 
+  private val conditionalHandler: VAstConditionalHandler = converter.getConditionalHandler
+  private val variableHandler: VAstVariableHandler = converter.getDeclarationHandler
+
   override def getInitialConverterState: Any = Seq.empty[(Node, Node)]
 
   override def convert(superCVAst: Node, converterState: VAstConverterState): Option[Seq[Ast]] = {
     val astSubtree: Seq[Ast] = superCVAst.getName match {
       case "Declaration" =>
+        // Special treatment of the variable declaration root node.
         val declarationNode: Node = superCVAst.getNode(PREVIOUS_VARIABLE_DECLARATION)
-        val conditionalHandler: VAstConditionalHandler = converter.getConditionalHandler
-        if (conditionalHandler.isSuperCConditionalNode(declarationNode)) {
-          conditionalHandler.handleAndSimplifyConditional(declarationNode, converterState,
+        conditionalHandler.handleAndSimplifyConditionalExtended(declarationNode, converterState,
             (node: Node, state: VAstConverterState) => converter.convert(node, state))
-        } else {
-          converter.convert(declarationNode, converterState)
-        }
+
       case "DeclaringList" => createDeclarations(superCVAst, converterState: VAstConverterState)
     }
 
@@ -45,8 +45,8 @@ class VAstPatternConverterForVariableDeclaration(vAstCreator: VAstCreatorNew, co
 
   private def createDeclarations(declarationNode: Node, converterState: VAstConverterState): Seq[Ast] = {
 
-    // Collects all consecutive variable declarations that hare the same conditions.
-    val newDeclarations: ListBuffer[(Node, Node)] = ListBuffer.empty[(Node, Node)]
+    // Collects all consecutive variable declarations that have the same conditions.
+    val newDeclarations: ListBuffer[(Node, Node)] = ListBuffer.empty[(Node, Node)] // ListBuffer[(<variable node root (with pointer and array information)>, <initialization root node>)]
     var currentDeclarationNode: Node = declarationNode
     while (currentDeclarationNode.getName.equals(VARIABLE_DECLARATION_NODE_NAME)) {
       // Extracts the variable name and the initialization.
@@ -60,11 +60,10 @@ class VAstPatternConverterForVariableDeclaration(vAstCreator: VAstCreatorNew, co
       currentDeclarationNode = currentDeclarationNode.getNode(PREVIOUS_VARIABLE_DECLARATION)
     }
 
-    // Extends the variable declaration list.
-    val previousDeclarations: Seq[(Node, Node)] = converterState.getState(this).asInstanceOf[Seq[(Node, Node)]]
-    val allDeclarations: Seq[(Node, Node)] = previousDeclarations ++ newDeclarations.toSeq
+    // Extends the pending variable declaration list.
+    val previousDeclarations: Seq[(Node, Node)] = converterState.getState(this).asInstanceOf[Seq[(Node, Node)]] // ListBuffer[(<variable node root (with pointer and array information)>, <initialization root node>)]
+    val allDeclarations: Seq[(Node, Node)] = previousDeclarations ++ newDeclarations.toSeq // ListBuffer[(<variable node root (with pointer and array information)>, <initialization root node>)]
 
-    val conditionalHandler: VAstConditionalHandler = converter.getConditionalHandler
     if (conditionalHandler.isSuperCConditionalNode(currentDeclarationNode)) {
       // If the next node is a conditional.
       // Prepares and performances the conditional handling.
@@ -74,6 +73,14 @@ class VAstPatternConverterForVariableDeclaration(vAstCreator: VAstCreatorNew, co
     } else {
       // If the variable types node is reached.
       // Defines all declarations and initializations.
+      variableHandler.handleVariableType(currentDeclarationNode, converterState,
+        (variableTypeState: VAstConverterState, variableType: String, line: Option[Int], column: Option[Int]) => {
+          allDeclarations.flatMap((variableNameNode: Node, initialisationNode) => {
+            createVariableDeclaration(variableType, variableNameNode, initialisationNode, variableTypeState)
+          })
+        })
+
+      /**
       val variableType: String = currentDeclarationNode.getString(0)
       allDeclarations.flatMap((variableNameNode: Node, initialisationNode) => {
         if (conditionalHandler.isSuperCConditionalNode(variableNameNode)) {
@@ -83,41 +90,62 @@ class VAstPatternConverterForVariableDeclaration(vAstCreator: VAstCreatorNew, co
           createVariableDeclaration(variableType, variableNameNode, initialisationNode, converterState)
         }
       })
+      **/
     }
   }
 
   private def createVariableDeclaration(variableType: String, variableNameNode: Node, initialisationNode: Node,
                                         converterState: VAstConverterState): Seq[Ast] = {
-    val variableName: String = variableNameNode.getNode(0).getString(0)
+    conditionalHandler.handleAndSimplifyConditionalExtended(variableNameNode, converterState,
+      (variableNode: Node, variableState: VAstConverterState) => {
+      variableHandler.handleDeclarationWithLocation(variableNode, variableType, variableState,
+        (variableNameRootNode: Node, converterState: VAstConverterState, variableNameNode: Node, fullVariableType: String, variableName: String, code: String, line: Option[Int], column: Option[Int]) => {
+          createVariableDeclarationNode(variableNameRootNode, converterState, variableNameNode, fullVariableType,
+                                        variableName, code, line, column, initialisationNode)
+        })
+    })
+  }
 
-    val location: Location = variableNameNode.getNode(0).getLocation
-    val line: Option[Int] = if (location == null) None else Option(location.line)
-    val column: Option[Int] = if (location == null) None else Option(location.column)
-
-    val code: String = s"$variableType $variableName"
-    val declaration: NewLocal = vAstCreator.localNodeHelper(variableNameNode, variableName, code, variableType,
-      line=line, column=column)
+  private def createVariableDeclarationNode(variableNameRootNode: Node, converterState: VAstConverterState,
+                                            variableNameNode: Node, fullVariableType: String, variableName: String,
+                                            code: String, line: Option[Int], column: Option[Int],
+                                            initialisationRootNode: Node): Seq[Ast] = {
+    val declaration: NewLocal = vAstCreator.localNodeHelper(variableNameRootNode, variableName, code, fullVariableType,
+                                                            line=line, column=column)
     val declarationAst: Ast = vAstCreator.AstHelper(declaration)
+    val initializationAsts: Seq[Ast] = createInitializationAst(initialisationRootNode, converterState, variableNameNode)
 
-    if (initialisationNode.size == 0) {
+    Seq(declarationAst) ++ initializationAsts
+  }
+
+  private def createInitializationAst(initialisationRootNode: Node, converterState: VAstConverterState,
+                                      variableNameNode: Node): Seq[Ast] = {
+    if (initialisationRootNode.size == 0) {
       // If it is only a variable declaration.
-      Seq(declarationAst)
+      Seq.empty[Ast]
 
     } else {
       // If it is a variable declaration with initialization.
-      // Converts the initialization node into an assignment node, because JOERN does not distinguish between
-      // initialization and assignment.
-      val targetVariableNode: Node = GNode.create(TARGET_VARIABLE_NODE_NAME, variableNameNode.getNode(0))
-      val assignmentOperatorNode: Node = GNode.create(ASSIGNMENT_OPERATOR_NODE_NAME)
-      val rhsNode = initializerExpression(initialisationNode)
-      val assignmentNode: Node = GNode.create(ASSIGNMENT_EXPRESSION_NODE_NAME, targetVariableNode,
-        assignmentOperatorNode, rhsNode)
 
-      Seq(declarationAst) ++ converter.convert(assignmentNode, converterState)
+      conditionalHandler.handleAndSimplifyConditionalExtended(initialisationRootNode, converterState,
+        (initialisationNode: Node, initializationState: VAstConverterState) => {
+          // Converts the initialization node into an assignment node, because JOERN does not distinguish between
+          // initialization and assignment.
+          val targetVariableNode: Node = GNode.create(TARGET_VARIABLE_NODE_NAME, variableNameNode.getNode(0)) // Creates the primary variable identifier node.
+          val assignmentOperatorNode: Node = GNode.create(ASSIGNMENT_OPERATOR_NODE_NAME) // Creates the
+          val assignmentExpression: Node = initializerExpression(initialisationNode)
+          val assignmentNode: Node = GNode.create(ASSIGNMENT_EXPRESSION_NODE_NAME, targetVariableNode,
+                                                  assignmentOperatorNode, assignmentExpression)
+
+          // Creates the initialization sub AST.
+          converter.convert(assignmentNode, converterState)
+        })
     }
   }
 
-  /** SuperC: initializer is either the expression itself (e.g. s.x, a * b) or wrapped in Initializer. */
+  /**
+   * SuperC: initializer is either the expression itself (e.g. s.x, a * b) or wrapped in Initializer.
+   */
   private def initializerExpression(initialisationNode: Node): Node =
     if (initialisationNode.getName == "Initializer" && initialisationNode.size() > 0) {
       initialisationNode.getNode(0)
