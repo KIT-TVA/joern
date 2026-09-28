@@ -73,13 +73,21 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
       val (returnTypeNodes: Seq[Ast], returnTypeString: String, returnTypeCode: String, methodLine: Int, methodColumn: Int)
         = getFunctionReturn(returnTypeRootNode, converterState)
 
+      // Adds a new variable namespace.
+      val newConverterState: VAstConverterState = variableHandler.addNewVariableNamespace(converterState)
+      
       // Translates the function parameters.
       val (parameterNodes: Seq[Ast], parameterSignatureString, parameterNodeCode) = getFunctionParameters(functionPropertyRootNode, converterState)
 
       // Translates the method instructions of the current method.
-      val instructionSuperCRootNode: Node = superCVAst.getNode(1)
-      val (codeBlockAst: Ast, codeBlockCode: String) =
-        getMethodInstructionBlock(instructionSuperCRootNode, converterState)
+      val codeBlockAst: Ast = converter.convert(superCVAst.getNode(1), newConverterState).head
+      val codeBlockCode: String = codeBlockAst.root match {
+        case None => "{}"
+        case Some(rootNode) => rootNode.asInstanceOf[AstNodeNew].code
+      }
+      //val instructionSuperCRootNode: Node = superCVAst.getNode(1)
+      //val (codeBlockAst: Ast, codeBlockCode: String) =
+      //  getMethodInstructionBlock(instructionSuperCRootNode, converterState)
 
       // Creates the method code and the generic method signature.
       val methodeCode: String = s"$returnTypeCode $methodName($parameterNodeCode) $codeBlockCode\n"

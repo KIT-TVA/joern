@@ -1,6 +1,6 @@
 package io.joern.c2cpg.astcreation
 
-import io.joern.c2cpg.astcreation.converter.{VASTPatternConverterForEmptyDefinition, VAstConditionalHandler, VAstConverter, VAstLogicHandler, VAstPatternConverter, VAstPatternConverterForBinaryOperators, VAstPatternConverterForBreakContinue, VAstPatternConverterForCast, VAstPatternConverterForConditionalMacro, VAstPatternConverterForEnum, VAstPatternConverterForForLoop, VAstPatternConverterForFunctionCall, VAstPatternConverterForFunctionDeclaration, VAstPatternConverterForGoto, VAstPatternConverterForIf, VAstPatternConverterForMemberAccess, VAstPatternConverterForParenthesizedExpression, VAstPatternConverterForReturn, VAstPatternConverterForSuperCRoot, VAstPatternConverterForSwitch, VAstPatternConverterForUnaryOperators, VAstPatternConverterForVariableDeclaration, VAstPatternConverterForVariableUse, VAstPatternConverterForWhileLoop, VAstVariableHandler}
+import io.joern.c2cpg.astcreation.converter.{VASTPatternConverterForEmptyDefinition, VAstConditionalHandler, VAstConverter, VAstLogicHandler, VAstPatternConverter, VAstPatternConverterForBinaryOperators, VAstPatternConverterForBreakContinue, VAstPatternConverterForCast, VAstPatternConverterForCodeBlock, VAstPatternConverterForConditionalMacro, VAstPatternConverterForEnum, VAstPatternConverterForForLoop, VAstPatternConverterForFunctionCall, VAstPatternConverterForFunctionDeclaration, VAstPatternConverterForGoto, VAstPatternConverterForIf, VAstPatternConverterForMemberAccess, VAstPatternConverterForParenthesizedExpression, VAstPatternConverterForReturn, VAstPatternConverterForSuperCRoot, VAstPatternConverterForSwitch, VAstPatternConverterForUnaryOperators, VAstPatternConverterForVariableDeclaration, VAstPatternConverterForVariableUse, VAstPatternConverterForWhileLoop, VAstVariableHandler}
 
 class VAstConverterForC(private var vAstCreator: VAstCreatorNew) extends VAstConverter(vAstCreator) {
   super.addLogicHandler(new VAstLogicHandler(vAstCreator, this))
@@ -9,6 +9,7 @@ class VAstConverterForC(private var vAstCreator: VAstCreatorNew) extends VAstCon
 
   private val patterns: List[VAstPatternConverter] = List.apply(
     new VAstPatternConverterForVariableUse(vAstCreator, this),
+    new VAstPatternConverterForCodeBlock(vAstCreator, this),
     new VAstPatternConverterForBinaryOperators(vAstCreator, this),
     new VAstPatternConverterForBreakContinue(vAstCreator, this),
     new VAstPatternConverterForCast(vAstCreator, this),

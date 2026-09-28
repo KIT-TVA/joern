@@ -465,9 +465,11 @@ class VAstVariableHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
     }
   }
 
-  def addNewVariableScop(converterState: VAstConverterState): VAstConverterState = {
-    val variableScope: Seq[mutable.Map[String,mutable.Map[String,String]]] = converterState.getState(this).asInstanceOf[Seq[mutable.Map[String,mutable.Map[String,String]]]]
-    val updatedVariableScope: Seq[mutable.Map[String,mutable.Map[String,String]]] = variableScope ++ Seq(variableScope.last.clone())
+  def addNewVariableNamespace(converterState: VAstConverterState): VAstConverterState = {
+    val variableScope: Seq[mutable.Map[String,mutable.Map[String,String]]] =
+      converterState.getState(this).asInstanceOf[Seq[mutable.Map[String,mutable.Map[String,String]]]]
+    val updatedVariableScope: Seq[mutable.Map[String,mutable.Map[String,String]]] =
+      variableScope ++ Seq(variableScope.last.clone())
     converterState.updateState(this, updatedVariableScope)
   }
 }
