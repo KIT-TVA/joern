@@ -29,19 +29,32 @@ class testCodeBlocks extends C2CpgSuite(withOssDataflow = true) {
       |   {}
       |   if (c == 2) {
       |     foo(c);
+      |     short c = 3;
+      |     c = 4;
       |   } else if (c == 3) {
       |     bar(c);
+      |     long c = -1;
+      |     c = 2;
       |   } else {
       |     bez(c);
+      |     unsigned int c = 6;
+      |     c = 9;
       |   }
       |   for (int q = 0; q < 10; q++) {
       |     foo(q);
+      |     bar(c);
+      |     unsigned long c = 0;
+      |     baz(c);
       |   }
       |   while (c == 10) {
       |     foo(c);
+      |     unsigned short c = 7;
+      |     bar(c);
       |   }
       |   do {
       |     foo(c);
+      |     float c = 8;
+      |     bar(c);
       |   } while (c == 11);
       |
       |   switch (c) {
