@@ -65,23 +65,7 @@ class VAstPatternConverterForIf(vAstCreator: VAstCreatorNew, converter: VAstConv
     else None
 
   private def convertBody(bodyNode: Node, converterState: VAstConverterState): Ast =
-    if (bodyNode.getName == "CompoundStatement" && bodyNode.size() >= 2) {
-      val stmtAsts = getChildren(bodyNode.getNode(1)).flatMap { child =>
-        convertStmt(child, converterState)
-      }
-      val (line, column) = locationOf(bodyNode)
-      val code           = stmtAsts.map(astCode).filter(_.nonEmpty).mkString("\n")
-      val block = vAstCreator.blockNodeHelper(
-        bodyNode,
-        if (code.nonEmpty) code else "<empty>",
-        "<???>",
-        line,
-        column
-      )
-      vAstCreator.blockAstHelper(block, stmtAsts.toList)
-    } else {
-      convertStmt(bodyNode, converterState).headOption.getOrElse(vAstCreator.AstHelper())
-    }
+    converter.convert(bodyNode, converterState).head
 
   /** Unwrap Conditional("1"); real `#ifdef` → CHOICE (same pattern as Switch / FunctionCall). */
   private def convertStmt(node: Node, converterState: VAstConverterState): Seq[Ast] = {

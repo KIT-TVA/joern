@@ -28,7 +28,7 @@ class VAstPatternConverterForWhileLoop(vAstCreator: VAstCreatorNew, converter: V
     if (iterationNode.size() < 3) None
     else {
       val conditionAst = convertSubtree(iterationNode.getNode(1), converterState)
-      val bodyAst      = convertBody(iterationNode.getNode(2), converterState)
+      val bodyAst      = converter.convert(iterationNode.getNode(2), converterState).head
       if (conditionAst.root.isEmpty) None
       else {
         val (line, column) = locationOf(iterationNode)
@@ -49,7 +49,7 @@ class VAstPatternConverterForWhileLoop(vAstCreator: VAstCreatorNew, converter: V
   private def convertDoWhile(iterationNode: Node, converterState: VAstConverterState): Option[Ast] = {
     if (iterationNode.size() < 3) None
     else {
-      val bodyAst = convertBody(iterationNode.getNode(1), converterState)
+      val bodyAst = converter.convert(iterationNode.getNode(1), converterState).head
       val conditionNode =
         if (iterationNode.size() >= 4 && keywordAt(iterationNode, 2) == "while") iterationNode.getNode(3)
         else iterationNode.getNode(2)
@@ -70,25 +70,6 @@ class VAstPatternConverterForWhileLoop(vAstCreator: VAstCreatorNew, converter: V
       }
     }
   }
-
-  private def convertBody(bodyNode: Node, converterState: VAstConverterState): Ast =
-    if (bodyNode.getName == "CompoundStatement" && bodyNode.size() >= 2) {
-      val stmtAsts = getChildren(bodyNode.getNode(1)).flatMap { child =>
-        converter.convert(child, converterState)
-      }
-      val (line, column) = locationOf(bodyNode)
-      val code           = stmtAsts.map(astCode).filter(_.nonEmpty).mkString("\n")
-      val block = vAstCreator.blockNodeHelper(
-        bodyNode,
-        if (code.nonEmpty) code else "<empty>",
-        "<???>",
-        line,
-        column
-      )
-      vAstCreator.blockAstHelper(block, stmtAsts.toList)
-    } else {
-      converter.convert(bodyNode, converterState).headOption.getOrElse(vAstCreator.AstHelper())
-    }
 
   private def convertSubtree(node: Node, converterState: VAstConverterState): Ast =
     converter.convert(node, converterState).headOption.getOrElse(vAstCreator.AstHelper())

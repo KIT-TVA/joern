@@ -36,7 +36,7 @@ class VAstPatternConverterForForLoop(vAstCreator: VAstCreatorNew, converter: VAs
         initAsts.partition(_.root.exists(_.isInstanceOf[NewLocal]))
       val conditionAsts = convertOptional(condNode, converterState)
       val updateAsts    = convertOptional(updateNode, converterState)
-      val bodyAst       = convertBody(bodyNode, converterState)
+      val bodyAst       = converter.convert(bodyNode, converterState)
 
       val (line, column) = locationOf(forNode)
       val code = s"for (${astCodeSeq(plainInitAsts)}; ${astCodeSeq(conditionAsts)}; ${astCodeSeq(updateAsts)})"
@@ -102,25 +102,6 @@ class VAstPatternConverterForForLoop(vAstCreator: VAstCreatorNew, converter: VAs
       }
     }
   }
-
-  private def convertBody(bodyNode: Node, converterState: VAstConverterState): Ast =
-    if (bodyNode.getName == "CompoundStatement" && bodyNode.size() >= 2) {
-      val stmtAsts = getChildren(bodyNode.getNode(1)).flatMap { child =>
-        converter.convert(child, converterState)
-      }
-      val (line, column) = locationOf(bodyNode)
-      val code           = stmtAsts.map(astCode).filter(_.nonEmpty).mkString("\n")
-      val block = vAstCreator.blockNodeHelper(
-        bodyNode,
-        if (code.nonEmpty) code else "<empty>",
-        "<???>",
-        line,
-        column
-      )
-      vAstCreator.blockAstHelper(block, stmtAsts.toList)
-    } else {
-      converter.convert(bodyNode, converterState).headOption.getOrElse(vAstCreator.AstHelper())
-    }
 
   private def keywordAt(node: Node, index: Int): String =
     if (index >= node.size()) ""

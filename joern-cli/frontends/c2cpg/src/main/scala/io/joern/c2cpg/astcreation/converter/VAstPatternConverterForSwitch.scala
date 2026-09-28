@@ -55,11 +55,12 @@ class VAstPatternConverterForSwitch(vAstCreator: VAstCreatorNew, converter: VAst
   }
 
   private def convertSwitch(switchNode: Node, converterState: VAstConverterState): Option[Ast] = {
+    val newConverterState: VAstConverterState = converter.getDeclarationHandler.addNewVariableNamespace(converterState)
     val offset = if (keywordAt(switchNode, 0).contains("switch")) 1 else 0
     if (switchNode.size() < offset + 2) None
     else {
-      val conditionAst   = convertExpr(switchNode.getNode(offset), converterState)
-      val bodyAst        = convertBody(switchNode.getNode(offset + 1), converterState)
+      val conditionAst   = convertExpr(switchNode.getNode(offset), newConverterState)
+      val bodyAst        = convertBody(switchNode.getNode(offset + 1), newConverterState)
       val (line, column) = locationOf(switchNode)
       val code           = s"switch (${astCode(conditionAst)})"
       val ctrl =
