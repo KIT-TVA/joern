@@ -110,21 +110,168 @@
 11. Once IntelliJ finished the import, you can close the sbt console and should be able to compile the project in IntelliJ.
 
 
+---
+
 ## Usage & Development
-The SuperC frontend is implemented as part of the C frontend. 
-The implementation of the frontend is located at ```joern/joern-cli/frontends/c2cpg/src/main/scala/io.joern.c2cpg/astcreation/VAstCreator```.
-The corresponding tests are located at ```joern/joern-cli/frontends/c2cpg/src/main/test/scala/io.joern.c2cpg/variability```.
-Furthermore changes to the derivation process of the CFG have been made in ```src/main/scala/io/joern/x2cpg/passes/controlflow/cfgcreation/CfgCreator.scala``` and the PDG annotation pass is located at ```src/main/scala/io/joern/c2cpg/passes/variability/PdgPresenceConditionAnnotationPass.scala```.   
+
+### Development
+- The SuperC frontend is implemented as part of the C frontend.
+  The implementation of the frontend is located at [```joern/joern-cli/frontends/c2cpg/src/main/scala/io.joern.c2cpg/astcreation/```](joern/joern-cli/frontends/c2cpg/src/main/scala/io.joern.c2cpg/astcreation/). The enty point for the VA-AST is the [```VAstCreatorNew.scala```](joern/joern-cli/frontends/c2cpg/src/main/scala/io.joern.c2cpg/astcreation/VAstCreatorNew.scala).
+  All defined ```VAstPatternConverters``` and ```VAstFeatureHandler``` are located in [```joern/joern-cli/frontends/c2cpg/src/main/scala/io.joern.c2cpg/astcreation/converter```](joern/joern-cli/frontends/c2cpg/src/main/scala/io.joern.c2cpg/astcreation/converter) and are registerres/initizialted in [```joern/joern-cli/frontends/c2cpg/src/main/scala/io.joern.c2cpg/astcreation/VAstConverterForC.scala```](joern/joern-cli/frontends/c2cpg/src/main/scala/io.joern.c2cpg/astcreation/VAstConverterForC.scala)
+  A ```VAstPatternConverters``` handles the conversion of one C-Feature as listed in the table below. A ```VAstFeatureHandler```provides functionality that is required by multiple ```VAstPatternConverter```s.
+
+- The corresponding tests are located at [```joern/joern-cli/frontends/c2cpg/src/main/test/scala/io.joern.c2cpg/variability```](joern/joern-cli/frontends/c2cpg/src/main/test/scala/io.joern.c2cpg/variability).
+
+- Furthermore, changes to the derivation process of the CFG have been made in ```src/main/scala/io/joern/x2cpg/passes/controlflow/cfgcreation/CfgCreator.scala``` and the PDG annotation pass is located at ```src/main/scala/io/joern/c2cpg/passes/variability/PdgPresenceConditionAnnotationPass.scala```.
+
+- The SuperC VA-AST plotting implementation is lacated in [```joern/joern-cli/frontends/c2cpg/src/main/test/scala/io.joern.c2cpg/variability/util/TestUtil.scala```](joern/joern-cli/frontends/c2cpg/src/main/test/scala/io.joern.c2cpg/variability/util/TestUtil.scala). If only a SuperC VA-AST should be ploted ```TestUtil.superCGraphToDotGraph(...)``` an be used, but it is recomende to use ```TestUtil.generateVASTDot(...)```, ```TestUtil.generateVCFGDot(...)```, ```TestUtil.generateVPDGDot(...)```, ```TestUtil.generateVCPGDot(...)``` to abstrct from the aditional complexity event if the variabiable JOERN GRAPH is also returned.
+
+- The JOERN AST, CFG, PDG, CPG, VA-AST, VA-CFG, VA-PDG and VA-CPG can be plotted with ```DotAstGenerator.dotAst(...)``` and ```DotCpg14Generator.toDotCpg14(...)```. The JOERN dot-graph generator extensions are located in [```joern/joern-cli/frontends/c2cpg/src/test/scala/io/joern/c2cpg/variability/vast/DotSerializer.scala```](joern/joern-cli/frontends/c2cpg/src/test/scala/io/joern/c2cpg/variability/vast/DotSerializer.scala).
+
+### Test-Case Structure
+```scala
+package io.joern.c2cpg.variability.vast
+
+import io.joern.c2cpg.testfixtures.C2CpgSuite
+import io.joern.c2cpg.variability.util.TestUtil.generateVASTDot
+import io.joern.x2cpg.testfixtures.TestCpg
+import io.shiftleft.codepropertygraph.generated.nodes
+import io.shiftleft.codepropertygraph.generated.nodes.Method
+import io.shiftleft.semanticcpg.dotgenerator.DotAstGenerator
+
+class testComplexFunctionReturnTypes extends C2CpgSuite(withOssDataflow = true) {
+
+  /////////////////////////
+  //    C-Sample Code    //
+  /////////////////////////
+  // Defines the C sample.
+  val cFileName: String = "Test.c"
+  val cCode: String =
+    """
+      |void foo() {
+      |  int x = source(); // Attacker−controlled.
+      |  if(x < MAX){ // Does not enforce x >= 0.
+      |    int y = 0;
+      |#ifdef CONFIG_PROCESS_INPUT
+      |    y = 2 * x;
+      |  #ifdef CONFIG_SEND_DATA
+      |    sink(y); // Security−sensitive operation.
+      |  #endif
+      |#endif
+      |    // ...
+      |  }
+      |}
+      |
+      |""".stripMargin
+
+
+  /////////////////////////////////////////////////////////////////////////
+  //    JOERN C-Frontend Implementation (without Variability Support)    //
+  /////////////////////////////////////////////////////////////////////////
+  // Creates the CPG (together with AST, CFG and PDG) using the default C-Frontend of JOERN.
+  val cCpg: TestCpg = code(cCode, cFileName)
+
+  // Splits the returned JOERN CPG into several Sub-CPGs that start with a method declaration node (node kind 25),
+  // including the "<global>" method declaration node, that contains all variable and method declarations.
+  val cTraversal: Iterator[Method] = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
+
+  // Returns for each of the method declaration sub-CPGs the AST as a dot-graph with node coloring (withColoring = true)
+  // and all node-specific parameters, except for graph-related parameters (extendedView = true).
+  val cAstDotString: Iterator[String] = DotAstGenerator.dotAst(cTraversal, extendedView = true, withColoring = true)
+  println("Standard JOERN C AST:")
+  println(cAstDotString.mkString)
+
+  // Returns for each of the method declaration sub-CPGs the CPG as a dot-graph with node coloring (withColoring = true),
+  // edge coloring and all node-specific parameters, except for graph-related parameters (extendedView = true).
+  val cCpgDotString: Iterator[String] = DotCpg14Generator.toDotCpg14(cTraversal, extendedView = true, withColoring = true)
+  println("Standard JOERN C CPG:")
+  println(cCpgDotString.mkString)
+
+
+
+  ///////////////////////////////////////////////////////////////////
+  //    Variable C-Frontend Implementation (out Implementation)    //
+  ///////////////////////////////////////////////////////////////////
+  // Creates the JOERN VA-CPG (together with VA-AST, VA-CFG and VA-PDG) using the new variable C-Frontend of JOERN and
+  // returns the SuperC VA-AST and JOERN VA-ASTs (extendedView = true, withColoring = true) as dot-graphs.
+  val (superCAstDotString: String, superCJoernAstDotString: String) = generateVASTDot(cCode, cFileName)
+
+  println("\nSuperC VA-AST (original data structure):")
+  println(superCAstDotString)
+  println("\nSuperC-JOERN VA-AST (translated to JOERN VA-AST data structure):")
+  println(superCJoernAstDotString)
+
+
+  // Creates the JOERN VA-CPG (together with VA-AST, VA-CFG and VA-PDG) using the new variable C-Frontend of JOERN and
+  // returns the SuperC VA-AST and JOERN VA-CPGs (extendedView = true, withColoring = true and edge coloring) as
+  // dot-graphs.
+  val (superCCpgDotString: String, superCJoernCpgotString: String) = generateVASTDot(cCode, cFileName)
+
+  println("\nSuperC VA-AST (original data structure):")
+  println(superCCpgDotString)
+  println("\nSuperC-JOERN VA-CPG (translated to JOERN VA-CPG data structure):")
+  println(superCJoernCpgotString)
+}
+
+```
+
+
+
+
+---
+
+## Current State
+
+### Supported C-Feature
+| Task | Description | Status |
+|:---:|:---|:---:|
+| 1 | unary operations handling | <span style="color:green">done</span> |
+| 2 | binary operations handling | <span style="color:green">done</span> |
+| 3 & 4 | multi variable declaration | <span style="color:green">done</span> |
+| 5 | ```typedef``` and ```struct``` declaration | <span style="color:red">todo</span> |
+| 6 | assembly code and register access handling [optional] | <span style="color:red">todo</span> |
+| 7 | ```enum``` declaration | <span style="color:green">done</span> |
+| 8 | ```goto``` and ```goto label``` handling | <span style="color:green">done</span> |
+| 9 | multi file support [optional] | <span style="color:red">todo</span> |
+| 10 & 15 | multi function declaration | <span style="color:orange">ongoing</span> |
+| 11 | code generation/reconstruction | <span style="color:green">done</span> |
+| 12 | ```if``` statements | <span style="color:green">done</span> |
+| 13 | ```switch```-case statements | <span style="color:green">done</span> |
+| 14 | code block handling | <span style="color:green">done</span> |
+| 16 | function call handling | <span style="color:green">done</span> |
+| 17 | static assertions [optional] | <span style="color:red">todo</span> |
+| 18 | dot-graph generation for JOERN and SuperC | <span style="color:green">done</span> |
+| 19 | ```while``` and ```do-while``` loop handling | <span style="color:green">done</span> |
+| 20 | ```for``` loop handling | <span style="color:green">done</span> |
+| 21 | ```breake```, ```continue``` instruction handling | <span style="color:green">done</span> |
+| 22 | simple parameterized macro handling | <span style="color:red">todo</span> |
+| 23 | conditional macros handling | <span style="color:green">done</span> |
+
+More detailed information on the software architecture, the current status, and the background can be found in the PDF [Family-Based_Vulnerability_Discovery_for_HCSS.pdf](doc/Family-Based_Vulnerability_Discovery_for_HCSS.pdf) and the presentation [Family-Based_Vulnerability_Discovery_for_HCSS_(slides).pdf](doc/Family-Based_Vulnerability_Discovery_for_HCSS_(slides).pdf).
+
+### General notes on the implementation:
+1. Each C feature has its own ```VAstPatternConverter```, which implements ```io.joern.c2cpg.astcreation.converter.VAstPatternConverter``` and must be registered in ```VASTConverterForC```.
+2. Functionality required by multiple C features is outsourced to so-called ```VAstFeatureHandler```s, which also has to be registered in ```VASTConverterForC```.
+3. The location information methods in ```VASTCreatorNew``` should not be used, because it is simpler to extract the code positions directly from the SuperC AST (from the Language and Text nodes).
+4. JOERN Choice nodes can now have more than 2 sub-ASTs and never have a code position specified.
+5. JOERN return nodes have a code position specification only if they have a return argument; otherwise, they have no code position specification.
+6. The JOERN dot-graph plotting functionality now offers options for coloring important nodes, outputting important node parameters, or edge-type coloring.
+6. The SuperC AST can now also be output as a dot graph.
+7. Red colored JOERN nodes in the VAST or other JOERN graphs indicate an incomplete translation caused by missing C feature support.
+8. All tests are located in the package: ```io.joern.c2cpg.variability.vast```
+
+### Notes on remaining tasks and adjustments to the other graph creators (CFG, ...):
+1. It is recommended to implement ```typedef``` and ```struct``` declarations as ```VAstFeatureHandler``` and, similar to the ```VAstPatternConverterForConditionalMacro```, to define an additional ```VASTPatternConverter``` that internally uses the ```VAstFeatureHandler```, because ```typedef``` and ```struct``` declarations can be combined with variable declarations, meaning that a ```typedef``` or ```struct``` declaration can be a sub-AST of a variable declaration or a multi-variable declaration.
+2. It is essential to ensure that control flows and data dependencies are handled correctly for complex features such as method declarations or switch cases, especially since a major adjustment has been made in the modeling of conditional return types for method declarations and ```Choice``` nodes can now have more than two children.
+3.  It is recommended to adjust the function parameter declaration again and use a structure similar to that of variable accesses (JOERN ```Identifier``` nodes) if the parameters are conditional.
+4. The conditional handling of the conditional return-type pointer degree and the conditional decision of whether an array is returned is still missing and needs to be added.
+5. The handling of array initializations needs to be added.
 
 
 
 
 
-
-
-
-
-
+---
 
 
 
