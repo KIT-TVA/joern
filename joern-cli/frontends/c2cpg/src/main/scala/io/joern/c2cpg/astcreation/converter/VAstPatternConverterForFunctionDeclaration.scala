@@ -7,6 +7,8 @@ import io.shiftleft.codepropertygraph.generated.{ControlStructureTypes, nodes}
 import io.shiftleft.codepropertygraph.generated.nodes.{AstNodeNew, NewBlock, NewControlStructure, NewMethod, NewMethodParameterIn, NewMethodRef, NewMethodReturn, NewNode}
 import superc.core.PresenceConditionManager.PresenceCondition
 import superc.core.Syntax
+import superc.core.Syntax.{Language, Text}
+import superc.cparser.CTag
 import xtc.tree.{GNode, Location, Node}
 
 import scala.collection.JavaConverters.asScalaSetConverter
@@ -39,14 +41,22 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
   private val JOERN_JOERN_METHOD_RETURN_NODE_LABEL: String = "METHOD_RETURN"
   
   private val CHOICE_TYPE_SEPARATOR: String = ";"
-  
+
+  /**
+   * Important: This Implementation does not support conditional pointers as return type. The type and array part of the
+   * return type can be conditional.
+   *
+   * @param superCVAst
+   * @param converterState
+   * @return
+   */
   override def convert(superCVAst: Node, converterState: VAstConverterState): Option[Seq[Ast]] = {
     // Extracts all important parameters
     val functionPropertyRootNode: Node = superCVAst.getNode(0)
     val methodRootCodeNode: Node = superCVAst.getNode(1)
-    val methodReturnTypeNode: Node = functionPropertyRootNode.getNode(0)
-    val methodNameRootNode: Node = functionPropertyRootNode.getNode(1).getNode(0)
-    val methodParameterListRootNode: Node = functionPropertyRootNode.getNode(1).getNode(1)
+
+    val (returnTypeRootNode: Node, returnTypeRootNode2: Option[Node], methodNameRootNode: Node, methodParameterListRootNode: Node) =
+      getFunctionHeadComponentNodes(functionPropertyRootNode)
 
     // Checks if the methode name is Conditional.
     if (conditionalHandler.isSuperCConditionalNode(methodNameRootNode)) {
@@ -55,9 +65,7 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
       // method declarations but unconditional method names.
       val newSubVAst: Node = conditionalHandler.createConditionalSuperCSubtree(methodNameRootNode, converterState,
                                                                                (methodNameNode: Node, state: VAstConverterState) => {
-        val newFunctionDeclarator: Node = GNode.create(FUNCTION_NAME_ROOT_NODE_NAME, methodNameNode, methodParameterListRootNode)
-        val newFunctionPropertyRootNode:  Node = GNode.create(FUNCTION_RETURN_TYPE_ROOT_NODE_NAME, methodReturnTypeNode, newFunctionDeclarator)
-        GNode.create(FUNCTION_DEFINITION, newFunctionPropertyRootNode, methodRootCodeNode)
+        createdUnconditionalFunctionDeclaration(superCVAst, methodNameNode)
       })
 
       // Transforms the modified SuperC VAST into as JOERN VAST.
@@ -66,18 +74,18 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
 
     } else {
       // Translates the method declarations if the method name is not conditional.
-      val methodName: String = functionPropertyRootNode.getNode(1).getNode(0).getNode(0).getString(0)
+      val methodName: String = methodNameRootNode.getNode(0).getString(0)
 
-      // Converts the return type and determines the method Position
-      val returnTypeRootNode: Node = functionPropertyRootNode.getNode(0)
+      // Converts the return type and determines the method Position.
       val (returnTypeNodes: Seq[Ast], returnTypeString: String, returnTypeCode: String, methodLine: Int, methodColumn: Int)
-        = getFunctionReturn(returnTypeRootNode, converterState)
+        = getFunctionReturn(returnTypeRootNode, converterState, returnTypeRootNode2)
 
       // Adds a new variable namespace.
       val newConverterState: VAstConverterState = variableHandler.addNewVariableNamespace(converterState)
       
       // Translates the function parameters.
-      val (parameterNodes: Seq[Ast], parameterSignatureString, parameterNodeCode) = getFunctionParameters(functionPropertyRootNode, converterState)
+      val (parameterNodes: Seq[Ast], parameterSignatureString, parameterNodeCode) =
+        getFunctionParameters(methodParameterListRootNode, converterState)
 
       // Translates the method instructions of the current method.
       val codeBlockAst: Ast = converter.convert(superCVAst.getNode(1), newConverterState).head
@@ -95,7 +103,7 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
 
       // Creates the methode root node
       val methodNode = NewMethod()
-        .name(superCVAst.getNode(0).getNode(1).getNode(0).getNode(0).getString(0))
+        .name(methodName)
         .filename(vAstCreator.getCurrentFilename)
         .code(methodeCode)
         .fullName(methodName)
@@ -123,6 +131,99 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
     }
   }
 
+  private def getFunctionHeadComponentNodes(functionPropertyRootNode: Node): (Node, Option[Node], Node, Node) = {
+    val functionReturnTypeNode: Node = functionPropertyRootNode.getNode(0)
+
+    var functionReturnPointer: Seq[Node] = Seq.empty[Node]
+    var functionHeadDescriptionNode: Node = functionPropertyRootNode.getNode(1)
+    while (functionHeadDescriptionNode.getName.equals("UnaryIdentifierDeclarator")) {
+      functionReturnPointer ++= Seq(functionHeadDescriptionNode.getNode(0))
+      functionHeadDescriptionNode = functionHeadDescriptionNode.getNode(1)
+    }
+
+    // Returns the function head parts.
+    functionHeadDescriptionNode.getName match {
+      case "FunctionDeclarator" =>
+        // If the return type is not a pointer or an array.
+        val functionReturnTypeNode2: Option[Node] = createReturnTypePointerAndArrayDescription(functionReturnPointer, None)
+        val functionNameRootNode: Node = functionHeadDescriptionNode.getNode(0)
+        val functionParameterListRootNode: Node = functionHeadDescriptionNode.getNode(1)
+        (functionReturnTypeNode, functionReturnTypeNode2, functionNameRootNode, functionParameterListRootNode)
+      case "AttributedDeclarator" =>
+        // If the return type is a pointer.
+        val functionReturnTypeNode2: Option[Node] = createReturnTypePointerAndArrayDescription(functionReturnPointer, None)
+        val functionNameRootNode: Node = functionHeadDescriptionNode.getNode(0).getNode(0)
+        val functionParameterListRootNode: Node = functionHeadDescriptionNode.getNode(0).getNode(1)
+        (functionReturnTypeNode, functionReturnTypeNode2, functionNameRootNode, functionParameterListRootNode)
+      case "PostfixIdentifierDeclarator" =>
+        // If the return type is an array or an array pointer.
+        val functionReturnTypeNode2: Option[Node] = createReturnTypePointerAndArrayDescription(functionReturnPointer, Option(functionHeadDescriptionNode.getNode(1)))
+        val functionNameRootNode: Node = functionHeadDescriptionNode.getNode(0).getNode(0)
+        val functionParameterListRootNode: Node = functionHeadDescriptionNode.getNode(0).getNode(1)
+        (functionReturnTypeNode, functionReturnTypeNode2, functionNameRootNode, functionParameterListRootNode)
+    }
+  }
+
+  private def createReturnTypePointerAndArrayDescription(pointerSeq: Seq[Node], arrayRootNode: Option[Node]): Option[Node] =
+    if (pointerSeq.isEmpty && arrayRootNode.isEmpty) None else {
+    // Creates the helperNode.
+    val syntax: Syntax.Text[CTag] = new Syntax.Text[CTag](CTag.OCTALconstant, "returnTypePart2")
+    syntax.setLocation(new Location("dummy.c", 42, 42))
+    val helperNode: Node = GNode.create("SimpleDeclarator", syntax)
+
+    // Handles the construction of the array part.
+    var returnTypePart2: Node = if (arrayRootNode.isDefined) {
+      GNode.create("ArrayDeclarator", helperNode, arrayRootNode.get)
+    } else helperNode
+
+    // Handles the construction of the pointer part.
+    for (pointerLiteralNode: Node <- pointerSeq.reverseIterator) {
+      returnTypePart2 = GNode.create("UnaryIdentifierDeclarator", pointerLiteralNode, returnTypePart2)
+    }
+    Option(returnTypePart2)
+  }
+
+  private def createdUnconditionalFunctionDeclaration(functionRootNode: Node, functionNameNode: Node): Node = {
+    val functionCode: Node = functionRootNode.getNode(1)
+    val functionHead: Node = functionRootNode.getNode(0)
+    val returnTypeRootNode: Node = functionHead.getNode(0)
+
+    var functionReturnPointer: Seq[Node] = Seq.empty[Node]
+    var functionHeadDescriptionNode: Node = functionHead.getNode(1)
+    while (functionHeadDescriptionNode.getName.equals("UnaryIdentifierDeclarator")) {
+      functionReturnPointer ++= Seq(functionHeadDescriptionNode.getNode(0))
+      functionHeadDescriptionNode = functionHeadDescriptionNode.getNode(1)
+    }
+
+    // Replicates the function parameters.
+    var newReturnTypePointerSection: Node = functionHeadDescriptionNode.getName match {
+      case "FunctionDeclarator" =>
+        // If the return type is not a pointer or an array.
+        GNode.create(FUNCTION_NAME_ROOT_NODE_NAME, functionNameNode, functionHeadDescriptionNode.getNode(1))
+
+      case "AttributedDeclarator" =>
+        // If the return type is a pointer.
+        val newFunctionDeclaratorNode: Node = GNode.create(FUNCTION_NAME_ROOT_NODE_NAME, functionNameNode,
+          functionHeadDescriptionNode.getNode(0).getNode(1))
+        GNode.create("AttributedDeclarator", newFunctionDeclaratorNode)
+
+      case "PostfixIdentifierDeclarator" =>
+        // If the return type is an array or an array pointer.
+        val newFunctionDeclaratorNode: Node = GNode.create(FUNCTION_NAME_ROOT_NODE_NAME, functionNameNode,
+          functionHeadDescriptionNode.getNode(0).getNode(1))
+        GNode.create("PostfixIdentifierDeclarator", newFunctionDeclaratorNode, functionHeadDescriptionNode.getNode(1))
+    }
+
+    // Replicates the return type pointer section .
+    for (pointerLiteralNode: Node <- functionReturnPointer.reverseIterator) {
+      newReturnTypePointerSection = GNode.create("UnaryIdentifierDeclarator", pointerLiteralNode, newReturnTypePointerSection)
+    }
+
+    // Replicates the function declaration root.
+    val newFunctionPrototypeNode: Node = GNode.create(FUNCTION_RETURN_TYPE_ROOT_NODE_NAME, returnTypeRootNode, newReturnTypePointerSection)
+    GNode.create(FUNCTION_DEFINITION, newFunctionPrototypeNode, functionCode)
+  }
+
   /**
    * Converts the method return type SuperC VAST into a JOERN VAST, determines the code position of the method
    * declaration and computes the return type code.
@@ -132,64 +233,59 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
    * @return Returns the method return type information as a tuple.
    *         (return type JOERN AST, return type (if required generic), return type code, method begin line, method, begin column)
    */
-  private def getFunctionReturn(returnTypeRootNode: Node, converterState: VAstConverterState): (Seq[Ast], String, String, Int, Int) = {
+  private def getFunctionReturn(returnTypeRootNode: Node, converterState: VAstConverterState,
+                                returnTypeRootNode2: Option[Node]): (Seq[Ast], String, String, Int, Int) = {
     // Initial definition of general method node properties that the translation of the method return nodes will
     // retrieve on the fly.
     var methodLine: Int = Int.MaxValue
     var methodColumn: Int = Int.MaxValue
     var returnTypes: Set[String] = Set.empty[String]
 
-    // Defines the method return tyoe node creator method.
-    val createReturnTypeNodes: (Node, VAstConverterState) => Seq[Ast] = (returnTypeNode: Node, converterState: VAstConverterState) => {
-      val returnTypeLine: Int = returnTypeNode.getLocation.line
-      val returnTypeColumn: Int = returnTypeNode.getLocation.column
-      val returnType: String = returnTypeNode.getString(0)
-      returnTypes = returnTypes + returnType
-
-      // Updates the code position of the method if the current code position does not point to the beginning of the
-      // method. This can happen when the return type is conditional because, in some situations, SuperC does not
-      // preserve the code-order of the return types in its conditional subtree.
-      if (methodLine > returnTypeLine) {
-        methodLine = returnTypeLine
-        methodColumn = returnTypeColumn
-      } else if ((methodLine == returnTypeLine) && (methodColumn > returnTypeColumn)) {
-        methodColumn = returnTypeColumn
-      }
-
-      val returnTypeStatement: NewMethodReturn = vAstCreator.methodReturnNodeHelper(returnTypeNode, returnType)
-        .lineNumber(returnTypeLine)
-        .columnNumber(returnTypeColumn)
-        .code(returnType)
-      Seq(vAstCreator.AstHelper(returnTypeStatement))
-    }
-
     // Converts all method return type node.
-    val returnTypeNodes: Seq[Ast] = if (conditionalHandler.isSuperCConditionalNode(returnTypeRootNode)) {
-      val returnNodes: Seq[Ast] = conditionalHandler.handleAndSimplifyConditional(returnTypeRootNode, converterState,
-        createReturnTypeNodes)
-      val typesList: String = returnNodes.map((returnAst: Ast) => {
-        returnAst.root.get match {
-          case methodReturnNode: NewMethodReturn => methodReturnNode.typeFullName
-          case controlStructureNode: NewControlStructure => returnAst.edges
-            .filter((edge: AstEdge) => edge.src == controlStructureNode)
-            .map((edge: AstEdge) => edge.dst.asInstanceOf[NewMethodReturn].typeFullName).head
-        }
-      }).sorted.mkString(";")
+    var returnTypeNodes: Seq[Ast] = variableHandler.handleVariableType(returnTypeRootNode, converterState,
+      (returnTypeState: VAstConverterState, returnType: String, returnTypeLine: Option[Int], returnTypeColumn: Option[Int]) => {
+        returnTypes = returnTypes + returnType
 
-      // Creates an additional generic/multitype return node. This is necessary because JOERN expects to have only a
-      // single finale/return point with only single return type.
-      val genericReturnType: String = s"choice[$typesList]"
-      val genericReturnTypeCode: String = returnNodes.map((returnType: Ast) => returnType.root.get.properties("CODE"))
-        .mkString("\n")
-      val genericReturnNode: NewMethodReturn = vAstCreator.methodReturnNodeHelper(returnTypeRootNode, genericReturnType)
+        // Updates the code position of the method if the current code position does not point to the beginning of the
+        // method. This can happen when the return type is conditional because, in some situations, SuperC does not
+        // preserve the code-order of the return types in its conditional subtree.
+        if (methodLine > returnTypeLine.get) {
+          methodLine = returnTypeLine.get
+          methodColumn = returnTypeColumn.get
+        } else if ((methodLine == returnTypeLine.get) && (methodColumn > returnTypeColumn.get)) {
+          methodColumn = returnTypeColumn.get
+        }
+
+        // Creates the return node.
+        if (returnTypeRootNode2.isDefined) {
+        variableHandler.handleDeclaration(returnTypeRootNode2.get, returnType, returnTypeState,
+          (n: Node, state: VAstConverterState, nameNode: Node, fullReturnType: String, parameterName: String, code: String) => {
+            createJoernReturnTypeNode(returnTypeRootNode, fullReturnType, returnTypeLine, returnTypeColumn)
+          }, registerTypeInNameScope=false)
+        } else {
+          createJoernReturnTypeNode(returnTypeRootNode, returnType, returnTypeLine, returnTypeColumn)
+        }
+      })
+
+    // Generates the generic and unconditional return type.
+    val returnTypeString: String = toTypeString(returnTypes)
+
+    // Checks if the return type is conditional.
+    if (returnTypeNodes.size > 1) {
+      // If the return type is conditional.
+      // Creates an additional generic/multi type return node and transforms the choice nodes of the returns types into
+      // a single multi-choice node. This is necessary because JOERN expects to have only a single finale/return point
+      // with only single return type.
+      val combinedConditionalReturnTypes: Ast = conditionalHandler.createJoernMultiChoiceNode(returnTypeRootNode,
+        returnTypeNodes.map(conditionalReturnTypeAst => ("1", conditionalReturnTypeAst)))
+      val genericReturnTypeCode: String = combinedConditionalReturnTypes.root.get.asInstanceOf[AstNodeNew].code
+      val genericReturnNode: NewMethodReturn = vAstCreator.methodReturnNodeHelper(returnTypeRootNode, returnTypeString)
         .lineNumber(methodLine)
         .columnNumber(methodColumn)
         .code(genericReturnTypeCode)
       val genericReturnAst: Ast = vAstCreator.AstHelper(genericReturnNode)
-      Seq(genericReturnAst.withChildren(returnNodes))
-
-    } else createReturnTypeNodes(returnTypeRootNode, converterState)
-    val returnTypeString: String = toTypeString(returnTypes)
+      returnTypeNodes = Seq(genericReturnAst.withChild(combinedConditionalReturnTypes))
+    }
 
     // Extracts the return type code and corrects the code field of the return node in the return-type JEORN VAST.
     val returnTypeCode: String = returnTypeNodes.head.root.get.asInstanceOf[NewMethodReturn].code
@@ -200,6 +296,15 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
 
     // Returns all method return information
     (returnTypeNodes, returnTypeString, returnTypeCode, methodLine, methodColumn)
+  }
+
+  private def createJoernReturnTypeNode(returnTypeRootNode: Node, fullReturnType: String,
+                                        line: Option[Int], column: Option[Int]): Seq[Ast] = {
+    val returnTypeStatement: NewMethodReturn = vAstCreator.methodReturnNodeHelper(returnTypeRootNode, fullReturnType)
+      .lineNumber(line)
+      .columnNumber(column)
+      .code(fullReturnType)
+    Seq(vAstCreator.AstHelper(returnTypeStatement))
   }
 
   private def toTypeString(types: Set[String]): String = if (types.size > 1) {
@@ -216,7 +321,7 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
    */
   private def getFunctionParameters(functionPropertyRootNode: Node, converterState: VAstConverterState): (Seq[Ast], String, String) = {
     // Converts the parameters.
-    val parameterTypeListNode: Node = functionPropertyRootNode.getNode(1).getNode(1).getNode(0)
+    val parameterTypeListNode: Node = functionPropertyRootNode.getNode(0)
     var parameterNodes: Seq[Ast] = Seq.empty[Ast]
     if (parameterTypeListNode.size > 0) { // Checks if the current method does have parameters
 
@@ -393,7 +498,7 @@ class VAstPatternConverterForFunctionDeclaration(vAstCreator: VAstCreatorNew, co
       }
     
     conditionalHandler.handleAndSimplifyConditionalExtended(parameterNameRootNode, converterState, (parameterNameNode: Node, parameterNameState: VAstConverterState) => {
-      variableHandler.handleDeclaration(parameterNameNode, parameterType, parameterNameState, parameterCreator)
+      variableHandler.handleDeclaration(parameterNameNode, parameterType, parameterNameState, parameterCreator, registerTypeInNameScope=false)
     })
   }
 

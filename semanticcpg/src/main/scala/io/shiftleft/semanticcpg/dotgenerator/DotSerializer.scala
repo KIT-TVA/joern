@@ -237,6 +237,8 @@ object DotSerializer {
         } else {
           " color=\"#4664AA\" style=filled fillcolor=\"#e0e3f4\""
         }
+      case n: Block if n.typeFullName.equals("<dummy block for missing implementaions>") =>
+        " color=\"#a22223\" style=filled fillcolor=\"#f2d5cb\""
       case _ => ""
     } else ""
 

@@ -34,7 +34,8 @@ class VAstVariableHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
   override def getInitialConverterState: Any = Seq(mutable.Map.empty[String,mutable.Map[String, String]])
 
   /**
-   * Handles the extraction of the function parameter type or variable type extraction and pass the annotated type information to the handle method together with the logcation information and the type root node
+   * Handles the extraction of the function parameter type or variable type and pass the annotated type information to
+   * the handle method together with the location information and the type root node.
    * 
    * Important:
    * This Method calls the provided handler methode for each conditional annotated type seperatly.
@@ -190,7 +191,8 @@ class VAstVariableHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
    * @return
    */
   def handleDeclaration(nameNode: Node, parameterType: String, converterState: VAstConverterState,
-                        parameterCreator: (Node, VAstConverterState, Node, String, String, String) => Seq[Ast]): Seq[Ast] = {
+                        parameterCreator: (Node, VAstConverterState, Node, String, String, String) => Seq[Ast],
+                        registerTypeInNameScope: Boolean = true): Seq[Ast] = {
 
       // Forwards the handling to the extended version of TODO: [...]
     handleDeclarationWithLocation(nameNode, parameterType, converterState,
@@ -200,17 +202,18 @@ class VAstVariableHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
   }
 
   def handleDeclarationWithLocation(nameNode: Node, parameterType: String, converterState: VAstConverterState,
-                                    parameterCreator: (Node, VAstConverterState, Node, String, String, String, Option[Int], Option[Int]) => Seq[Ast]): Seq[Ast] = {
+                                    parameterCreator: (Node, VAstConverterState, Node, String, String, String, Option[Int], Option[Int]) => Seq[Ast],
+                                    registerTypeInNameScope: Boolean = true): Seq[Ast] = {
 
     // Creates the importer parts of a parameter or variable.
     conditionalHandler.handleAndSimplifyConditionalExtended(nameNode, converterState, (node: Node, state: VAstConverterState) => {
-      handlePointInformation(node, state, parameterCreator, parameterType)
+      handlePointInformation(node, state, parameterCreator, parameterType, registerTypeInNameScope)
     })
   }
 
   private def handlePointInformation(pointerRootNode: Node, converterState: VAstConverterState,
                                      parameterCreator: (Node, VAstConverterState, Node, String, String, String, Option[Int], Option[Int]) => Seq[Ast],
-                                     parameterType: String): Seq[Ast] = {
+                                     parameterType: String, registerTypeInNameScope: Boolean): Seq[Ast] = {
     // Extracts the pointer information.
     var pointerInformation: String = ""
     var nextPointerNode: Node = pointerRootNode
@@ -222,13 +225,15 @@ class VAstVariableHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
     // Handle parameter/variable name
     conditionalHandler.handleAndSimplifyConditionalExtended(nextPointerNode, converterState,
       (node: Node, state: VAstConverterState) => {
-        handleParameterName(node, state, parameterCreator, pointerRootNode, parameterType, pointerInformation)
+        handleParameterName(node, state, parameterCreator, pointerRootNode, parameterType, pointerInformation,
+          registerTypeInNameScope)
       })
   }
 
   private def handleParameterName(node: Node, converterState: VAstConverterState,
                                   parameterCreator: (Node, VAstConverterState, Node, String, String, String, Option[Int], Option[Int]) => Seq[Ast],
-                                  nameRootNode: Node, parameterType: String, pointerInformation: String) = {
+                                  nameRootNode: Node, parameterType: String, pointerInformation: String,
+                                  registerTypeInNameScope: Boolean) = {
     node.getName match {
       case nodeName if (nodeName.equals(SIMPLE_PARAMETER_DECLARATION)) =>
         val location: Location = node.getNode(0).getLocation
@@ -236,7 +241,7 @@ class VAstVariableHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
         val column: Option[Int] = Option(location.column)
         val parameterName: String = node.getNode(0).getString(0)
         createNode(parameterType, parameterName, pointerInformation, "", nameRootNode, node, line, column,
-          parameterCreator, converterState)
+          parameterCreator, converterState, registerTypeInNameScope)
 
       case nodeName if (nodeName.equals(ARRAY_PARAMETER_DECLARATION)) =>
         // Extracts the parameter name.
@@ -252,7 +257,7 @@ class VAstVariableHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
             conditionalHandler.handleAndSimplifyConditionalExtended(node.getNode(1), parameterNameState,
               (n: Node, state: VAstConverterState) => {
                 handleArrayDimensions(n, state, parameterCreator, nameRootNode, node, parameterType, pointerInformation,
-                  parameterName, "", line, column)
+                  parameterName, "", line, column, registerTypeInNameScope)
               })
           })
     }
@@ -262,7 +267,7 @@ class VAstVariableHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
                                     parameterCreator: (Node, VAstConverterState, Node, String, String, String, Option[Int], Option[Int]) => Seq[Ast],
                                     nameRootNode: Node, nameNode: Node, parameterType: String, pointerInformation: String,
                                     parameterName: String, arrayDimensionInformation: String,
-                                    line: Option[Int], column: Option[Int]): Seq[Ast] = {
+                                    line: Option[Int], column: Option[Int], registerTypeInNameScope: Boolean): Seq[Ast] = {
 
     arrayDimensionNode.size match {
       case nChildren if nChildren == 2 =>
@@ -276,7 +281,8 @@ class VAstVariableHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
               (dimensionNode: Node, state: VAstConverterState) => {
                 // Handles the next array dimension.
                 handleArrayDimensions(dimensionNode, state, parameterCreator, nameRootNode, nameNode, parameterType,
-                  pointerInformation, parameterName, extendedArrayDimensionInformation, line, column)
+                  pointerInformation, parameterName, extendedArrayDimensionInformation, line, column,
+                  registerTypeInNameScope)
               })
           })
 
@@ -289,13 +295,14 @@ class VAstVariableHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
               // Handles the next array dimension.
               val extendedArrayDimensionInformation: String = "[]" + arrayDimensionInformation
               handleArrayDimensions(node, state, parameterCreator, nameRootNode, nameNode, parameterType,
-                pointerInformation, parameterName, extendedArrayDimensionInformation, line, column)
+                pointerInformation, parameterName, extendedArrayDimensionInformation, line, column,
+                registerTypeInNameScope)
 
             } else {
               // Creates the JOERN parameter/variable node.
               val finalVariableArrayInformation: String = s"[${node.getString(0)}]" + arrayDimensionInformation
               createNode(parameterType, parameterName, pointerInformation, finalVariableArrayInformation, nameRootNode,
-                nameNode, line, column, parameterCreator, converterState)
+                nameNode, line, column, parameterCreator, converterState, registerTypeInNameScope)
             }
           })
 
@@ -303,55 +310,18 @@ class VAstVariableHandler(vAstCreator: VAstCreatorNew, converter: VAstConverter)
         // If the first array dimension definition is reached and no dimension size is specified for this dimension.
         val finalVariableArrayInformation: String = "[]" + arrayDimensionInformation
         createNode(parameterType, parameterName, pointerInformation, finalVariableArrayInformation, nameRootNode,
-          nameNode, line, column, parameterCreator, converterState)
+          nameNode, line, column, parameterCreator, converterState, registerTypeInNameScope)
     }
   }
-
-  /** TODO Kann entfernt werden.
-  private def handleArrayDimensionsOrg(node: Node, converterState: VAstConverterState,
-                                       parameterCreator: (Node, VAstConverterState, String, String, String, Option[Int], Option[Int]) => Seq[Ast],
-                                       nameNode: Node, parameterType: String, pointerInformation: String,
-                                       parameterName: String, arrayDimensionInformation: String,
-                                       line: Option[Int], column: Option[Int]): Seq[Ast] = {
-    var nextArrayNode: Node = node
-    var variableArrayInformation: String = arrayDimensionInformation
-    var isArrayNode: Boolean = true
-    while (isArrayNode) {
-      println(s"address auf array dim node: 0x${java.lang.Integer.toHexString(System.identityHashCode(node))}")
-      variableArrayInformation = (nextArrayNode.size match {
-        case nChildren if (nChildren == 2) => s"[${nextArrayNode.getNode(1).getString(0)}]"
-        case nChildren if (nChildren == 1 && !nextArrayNode.getNode(0).getName.equals(ARRAY_DIMENSION_PARAMETER)) =>
-          s"[${nextArrayNode.getNode(0).getString(0)}]"
-        case _ => "[]"
-      }) + variableArrayInformation
-      if (nextArrayNode.size > 0 && (nextArrayNode.getNode(0).getName.equals(ARRAY_DIMENSION_PARAMETER)
-        || conditionalHandler.isSuperCConditionalNode(nextArrayNode.getNode(0)))) {
-        nextArrayNode = nextArrayNode.getNode(0)
-        isArrayNode = !conditionalHandler.isSuperCConditionalNode(nextArrayNode)
-      } else isArrayNode = false
-    }
-
-    if (conditionalHandler.isSuperCConditionalNode(nextArrayNode)) {
-      conditionalHandler.handleAndSimplifyConditional(nextArrayNode, converterState, (arrayNode: Node, state: VAstConverterState) => {
-        handleArrayDimensions(arrayNode, state, parameterCreator, nameNode, parameterType, pointerInformation,
-          parameterName, variableArrayInformation, line, column)
-      })
-    } else {
-      createNode(parameterType, parameterName, pointerInformation, variableArrayInformation, nameNode, line, column,
-        parameterCreator, converterState)
-    }
-  }
-  **/
-
 
   private def createNode(parameterType: String, parameterName: String, pointerInformation: String,
                          arrayDimensionInformation: String, nameRootNode: Node, nameNode: Node,
                          line: Option[Int], column: Option[Int],
                          parameterCreator: (Node, VAstConverterState, Node, String, String, String, Option[Int], Option[Int]) => Seq[Ast],
-                         converterState: VAstConverterState): Seq[Ast] = {
+                         converterState: VAstConverterState, registerTypeInNameScope: Boolean): Seq[Ast] = {
     val fullParameterType: String = parameterType + arrayDimensionInformation + pointerInformation
     val code: String = s"$parameterType$pointerInformation $parameterName$arrayDimensionInformation"
-    registerVariableType(parameterName, fullParameterType, converterState) // Registers the variable declaration.
+    if (registerTypeInNameScope) registerVariableType(parameterName, fullParameterType, converterState) // Registers the variable declaration.
     parameterCreator(nameRootNode, converterState, nameNode, fullParameterType, parameterName, code, line, column)
   }
 
