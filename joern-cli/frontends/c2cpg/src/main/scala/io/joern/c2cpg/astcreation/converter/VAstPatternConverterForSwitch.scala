@@ -55,12 +55,11 @@ class VAstPatternConverterForSwitch(vAstCreator: VAstCreatorNew, converter: VAst
   }
 
   private def convertSwitch(switchNode: Node, converterState: VAstConverterState): Option[Ast] = {
-    val newConverterState: VAstConverterState = converter.getDeclarationHandler.addNewVariableNamespace(converterState)
     val offset = if (keywordAt(switchNode, 0).contains("switch")) 1 else 0
     if (switchNode.size() < offset + 2) None
     else {
-      val conditionAst   = convertExpr(switchNode.getNode(offset), newConverterState)
-      val bodyAst        = convertBody(switchNode.getNode(offset + 1), newConverterState)
+      val conditionAst   = convertExpr(switchNode.getNode(offset), converterState)
+      val bodyAst        = convertBody(switchNode.getNode(offset + 1), converterState)
       val (line, column) = locationOf(switchNode)
       val code           = s"switch (${astCode(conditionAst)})"
       val ctrl =
@@ -86,7 +85,9 @@ class VAstPatternConverterForSwitch(vAstCreator: VAstCreatorNew, converter: VAst
             converterState,
             (resolvedValue, state) => convertCaseLabelOnly(labelNode, textOf(resolvedValue)).filter(isJumpTarget).take(1)
           )
-        case None => convertCaseLabelOnly(labelNode, caseValue(labelNode)).filter(isJumpTarget)
+        case None =>
+          // Plain case: JUMP_TARGET plus the case value, same as Joern's astsForCaseStatement.
+          convertCaseLabelOnly(labelNode, caseValue(labelNode))
       }
 
   private def labelKind(node: Node): Option[String] =
@@ -211,7 +212,8 @@ class VAstPatternConverterForSwitch(vAstCreator: VAstCreatorNew, converter: VAst
         case Some(kind) =>
           closeSection()
           val labels: Seq[Ast] = labelAsts(statementNode, kind, converterState)
-          bodyAsts ++= labels.filter(ast => isJumpTarget(ast) || isChoice(ast))
+          // Keep the case-value literal/identifier. It sits beside the JUMP_TARGET.
+          bodyAsts ++= labels
           sectionAnchor = statementNode
           insideSection = true
           sectionAsts ++= bodyPieces(nestedStmt(statementNode, converterState))
