@@ -206,6 +206,32 @@ trait AstNodeBuilder[Node, NodeProcessor] { this: NodeProcessor =>
     setOffset(node, node_)
   }
 
+  protected def parameterInNodeCreator(
+                                 node: Node,
+                                 name: String,
+                                 code: String,
+                                 index: Int,
+                                 isVariadic: Boolean,
+                                 evaluationStrategy: String,
+                                 typeFullName: String,
+                                 dynamicTypeHintFullName: Seq[String] = Nil,
+                                 line: Option[Int] = None,
+                                 column: Option[Int] = None
+                               ): NewMethodParameterIn = {
+    val node_ = NewMethodParameterIn()
+      .name(name)
+      .code(code)
+      .index(index)
+      .order(index)
+      .isVariadic(isVariadic)
+      .evaluationStrategy(evaluationStrategy)
+      .lineNumber(line)
+      .columnNumber(column)
+      .typeFullName(typeFullName)
+      .dynamicTypeHintFullName(dynamicTypeHintFullName)
+    setOffset(node, node_)
+  }
+
   def callNode(node: Node, code: String, name: String, methodFullName: String, dispatchType: String): NewCall =
     callNode(node, code, name, methodFullName, dispatchType, None, None)
 
@@ -231,6 +257,30 @@ trait AstNodeBuilder[Node, NodeProcessor] { this: NodeProcessor =>
     setOffset(node, node_)
   }
 
+  def callNodeCreator(
+    node: Node,
+    code: String,
+    name: String,
+    methodFullName: String,
+    dispatchType: String,
+    signature: Option[String],
+    typeFullName: Option[String],
+    line: Option[Int] = None,
+    column: Option[Int] = None
+  ): NewCall = {
+    val node_ =
+      NewCall()
+        .code(code)
+        .name(name)
+        .methodFullName(methodFullName)
+        .dispatchType(dispatchType)
+        .lineNumber(line)
+        .columnNumber(column)
+    signature.foreach { s => node_.signature(s) }
+    typeFullName.foreach { t => node_.typeFullName(t) }
+    setOffset(node, node_)
+  }
+
   protected def operatorCallNode(node: Node, name: String, typeFullName: Option[String]): NewCall = {
     callNode(node, code(node), name, name, DispatchTypes.STATIC_DISPATCH, Option(""), typeFullName)
   }
@@ -248,6 +298,15 @@ trait AstNodeBuilder[Node, NodeProcessor] { this: NodeProcessor =>
     setOffset(node, node_)
   }
 
+  protected def returnNodeCreator(node: Node, code: String,
+                                  line: Option[Int] = None, column: Option[Int] = None): NewReturn = {
+    val node_ = NewReturn()
+      .code(code)
+      .lineNumber(line)
+      .columnNumber(column)
+    setOffset(node, node_)
+  }
+
   protected def controlStructureNode(node: Node, controlStructureType: String, code: String): NewControlStructure = {
     val node_ = NewControlStructure()
       .parserTypeName(node.getClass.getSimpleName)
@@ -258,8 +317,23 @@ trait AstNodeBuilder[Node, NodeProcessor] { this: NodeProcessor =>
     setOffset(node, node_)
   }
 
+  protected def controlStructureNodeCreator(node: Node, controlStructureType: String, code: String,
+                                            line: Option[Int] = None, column: Option[Int] = None): NewControlStructure = {
+    val node_ = NewControlStructure()
+      .parserTypeName(node.getClass.getSimpleName)
+      .controlStructureType(controlStructureType)
+      .code(code)
+      .lineNumber(line)
+      .columnNumber(column)
+    setOffset(node, node_)
+  }
+
   protected def blockNode(node: Node): NewBlock = {
     blockNode(node, PropertyDefaults.Code, Defines.Any)
+  }
+
+  protected def emptyBlockNodeCreator(node: Node, line: Option[Int] = None, column: Option[Int] = None): NewBlock = {
+    blockNodeCreator(node, PropertyDefaults.Code, Defines.Any, line, column)
   }
 
   protected def blockNode(node: Node, code: String, typeFullName: String): NewBlock = {
@@ -268,6 +342,16 @@ trait AstNodeBuilder[Node, NodeProcessor] { this: NodeProcessor =>
       .typeFullName(typeFullName)
       .lineNumber(line(node))
       .columnNumber(column(node))
+    setOffset(node, node_)
+  }
+
+  protected def blockNodeCreator(node: Node, code: String, typeFullName: String,
+                                 line: Option[Int] = None, column: Option[Int] = None): NewBlock = {
+    val node_ = NewBlock()
+      .code(code)
+      .typeFullName(typeFullName)
+      .lineNumber(line)
+      .columnNumber(column)
     setOffset(node, node_)
   }
 
@@ -297,6 +381,18 @@ trait AstNodeBuilder[Node, NodeProcessor] { this: NodeProcessor =>
       line(node),
       column(node)
     )
+    setOffset(node, node_)
+  }
+
+  protected def localNodeCreator(node: Node,
+                      name: String,
+                      code: String,
+                      typeFullName: String,
+                      closureBindingId: Option[String] = None,
+                      genericSignature: Option[String] = None,
+                      line: Option[Int],
+                      column: Option[Int]): NewLocal = {
+    val node_ = AstNodeBuilder.localNodeWithExplicitPositionInfo(name, code, typeFullName, closureBindingId, genericSignature, line, column)
     setOffset(node, node_)
   }
 
@@ -357,6 +453,18 @@ trait AstNodeBuilder[Node, NodeProcessor] { this: NodeProcessor =>
   ): NewMethodReturn = {
     val node_ =
       methodReturnNodeWithExplicitPositionInfo(typeFullName, dynamicTypeHintFullName, line(node), column(node))
+    setOffset(node, node_)
+  }
+
+  protected def methodReturnNodeCreator(
+                                  node: Node,
+                                  typeFullName: String,
+                                  dynamicTypeHintFullName: Option[String] = None,
+                                  line: Option[Int] = None,
+                                  column : Option[Int] =  None
+                                ): NewMethodReturn = {
+    val node_ =
+      methodReturnNodeWithExplicitPositionInfo(typeFullName, dynamicTypeHintFullName, line, column)
     setOffset(node, node_)
   }
 

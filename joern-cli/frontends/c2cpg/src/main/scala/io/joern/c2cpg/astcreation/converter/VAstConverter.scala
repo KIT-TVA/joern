@@ -1,0 +1,106 @@
+package io.joern.c2cpg.astcreation.converter
+
+import io.joern.c2cpg.astcreation.VAstCreatorNew
+import io.joern.x2cpg.Ast
+import io.shiftleft.codepropertygraph.generated.nodes.NewBlock
+import xtc.tree.Node
+
+import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
+
+class VAstConverter(private val vAstCreator: VAstCreatorNew) {
+
+  private var conditionalHandler: Option[VAstConditionalHandler] = None
+  private var declarationHandler: Option[VAstVariableHandler] = None
+  private var logicHandler: Option[VAstLogicHandler] = None
+  private var initialConverterState: VAstConverterState = VAstConverterState()
+  private val patternConverters: mutable.Map[String, ListBuffer[VAstPatternConverter]] = mutable.Map.empty
+
+  def addPattern(pattern: VAstPatternConverter): Unit = {
+    val (rootNodeTypes: List[String], converter: VAstPatternConverter, state) = pattern.registerPatternConverter()
+    initialConverterState = initialConverterState.updateState(converter, state)
+    for (rootNodeType: String <- rootNodeTypes) {
+
+      val converterList: Option[ListBuffer[VAstPatternConverter]] = patternConverters.get(rootNodeType)
+      if (converterList.isEmpty) {
+        patternConverters.addOne(rootNodeType, ListBuffer.apply(converter))
+      } else {
+        converterList.get += converter
+      }
+    }
+  }
+
+  def addPatterns(patterns: List[VAstPatternConverter]): Unit = {
+    for (pattern: VAstPatternConverter <- patterns) addPattern(pattern)
+  }
+
+  def addConditionalHandler(conditionalHandler: VAstConditionalHandler): Unit = {
+    val initialState = conditionalHandler.getInitialConverterState
+    initialConverterState = initialConverterState.updateState(conditionalHandler, initialState)
+    this.conditionalHandler = Option(conditionalHandler)
+  }
+  
+  def addDeclarationHandler(declarationHandler: VAstVariableHandler): Unit = {
+    val initialState = declarationHandler.getInitialConverterState
+    initialConverterState = initialConverterState.updateState(declarationHandler, initialState)
+    this.declarationHandler = Option(declarationHandler)
+  }
+  
+  def addLogicHandler(logicHandler: VAstLogicHandler): Unit = {
+    val initialState = logicHandler.getInitialConverterState
+    initialConverterState = initialConverterState.updateState(logicHandler, initialState)
+    this.logicHandler = Option(logicHandler)
+  }
+
+  def convert(superCVAstNode: Node, converterState: VAstConverterState): Seq[Ast] = {
+    val nodeType: String = superCVAstNode.getName
+    val converterList: Option[ListBuffer[VAstPatternConverter]] = patternConverters.get(nodeType)
+    if (converterList == null || converterList.isEmpty) {
+      Seq.empty
+    } else {
+      val converters = converterList.get
+
+      var asts: Seq[Ast] = Seq.empty
+      var continueCommand: Boolean = true
+      var converterIndex: Int = 0
+      while (continueCommand && converterIndex < converters.size) {
+        val joernVAst: Option[Seq[Ast]] = converters(converterIndex).convert(superCVAstNode, converterState)
+        if (joernVAst.isDefined) {
+          asts = joernVAst.get
+          continueCommand = false
+        } else {
+          converterIndex += 1
+        }
+      }
+
+      if (asts.isEmpty) {
+        createDummyBlock(superCVAstNode)
+      } else {
+        asts
+      }
+    }
+  }
+
+  private def createDummyBlock(node: Node): Seq[Ast] = {
+    val blockNode: NewBlock = vAstCreator.blockNodeHelper(node, "", "<dummy block for missing implementaions>", None, None)
+    val ast: Ast = vAstCreator.blockAstHelper(blockNode, List.empty)
+    Seq(ast)
+  }
+
+  def getConditionalHandler: VAstConditionalHandler = {
+    require(conditionalHandler.isDefined, "No conditional handler is defined.")
+    conditionalHandler.get
+  }
+
+  def getDeclarationHandler: VAstVariableHandler = {
+    require(declarationHandler.isDefined, "No declaration handler is defined.")
+    declarationHandler.get
+  }
+
+  def getLogicHandler: VAstLogicHandler = {
+    require(logicHandler.isDefined, "No logic handler is defined.")
+    logicHandler.get
+  }
+
+  def getInitialConverterState: VAstConverterState = initialConverterState
+}

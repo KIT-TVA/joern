@@ -91,7 +91,7 @@ class AstCreator(
 
     val methodReturn = methodReturnNode(iASTTranslationUnit, Defines.Any)
     Ast(fakeGlobalTypeDecl).withChild(
-      methodAst(fakeGlobalMethod, Seq.empty, blockAst(blockNode_, declsAsts), methodReturn)
+      methodAst(fakeGlobalMethod, Seq.empty, blockAst(blockNode_, declsAsts), Seq(Ast(methodReturn)))
     )
   }
 

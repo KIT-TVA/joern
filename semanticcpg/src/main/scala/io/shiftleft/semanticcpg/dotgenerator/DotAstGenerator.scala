@@ -4,12 +4,16 @@ import io.shiftleft.codepropertygraph.generated.nodes.AstNode
 
 object DotAstGenerator {
 
-  def dotAst[T <: AstNode](traversal: Iterator[T], extended_view: Boolean = false): Iterator[String] =
-    traversal.map(e => dotAst(e, extended_view=extended_view))
+  private val GLOBAL_DOT_GRAPH_IDENTIFIER: String = "&lt;global&gt;"
 
-  def dotAst(astRoot: AstNode, extended_view: Boolean): String = {
-    val ast = new AstGenerator().generate(astRoot)
-    DotSerializer.dotGraph(Option(astRoot), ast, extended_view=extended_view)
+  def dotAst[T <: AstNode](traversal: Iterator[T], extendedView: Boolean = false,
+                           onlyGlobalGraph: Boolean = false, withColoring: Boolean = false): Iterator[String] = {
+    val astDotGraphs: Iterator[String] = traversal.map(e => dotAst(e, extendedView=extendedView, withColoring=withColoring))
+    if (onlyGlobalGraph) {
+      astDotGraphs.filter(dotGraph => dotGraph.startsWith(s"digraph \"$GLOBAL_DOT_GRAPH_IDENTIFIER\" {"))
+    } else {
+      astDotGraphs
+    }
   }
 
   def dotAst(astRoot: AstNode): String = {
@@ -17,4 +21,12 @@ object DotAstGenerator {
     DotSerializer.dotGraph(Option(astRoot), ast)
   }
 
+  def dotAst(astRoot: AstNode, withColoring: Boolean): String = {
+    dotAst(astRoot, extendedView=false, withColoring=withColoring)
+  }
+
+  def dotAst(astRoot: AstNode, extendedView: Boolean, withColoring: Boolean): String = {
+    val ast = new AstGenerator().generate(astRoot)
+    DotSerializer.dotGraph(Option(astRoot), ast, withEdgeTypes=false, extendedView=extendedView, withColoring=withColoring)
+  }
 }

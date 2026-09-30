@@ -54,7 +54,7 @@ abstract class AstCreatorBase[Node, NodeProcessor](filename: String)(implicit wi
     method: NewMethod,
     parameters: Seq[Ast],
     body: Ast,
-    methodReturn: NewMethodReturn,
+    methodReturn: NewMethodReturn | Seq[Ast],
     modifiers: Seq[NewModifier] = Nil
   ): Ast =
     methodAstWithAnnotations(method, parameters, body, methodReturn, modifiers, annotations = Nil)
@@ -63,19 +63,34 @@ abstract class AstCreatorBase[Node, NodeProcessor](filename: String)(implicit wi
     * parameter annotations.
     */
   def methodAstWithAnnotations(
-    method: NewMethod,
-    parameters: Seq[Ast],
-    body: Ast,
-    methodReturn: NewMethodReturn,
-    modifiers: Seq[NewModifier] = Nil,
-    annotations: Seq[Ast] = Nil
-  ): Ast =
-    Ast(method)
+                                method: NewMethod,
+                                parameters: Seq[Ast],
+                                body: Ast,
+                                methodReturn: NewMethodReturn | Seq[Ast],
+                                modifiers: Seq[NewModifier] = Nil,
+                                annotations: Seq[Ast] = Nil
+  ): Ast = {
+    val methodReturnAsts: Seq[Ast] = methodReturn match {
+      case returnType: NewMethodReturn => Seq(Ast(returnType))
+      case returnTypes => {
+        returnTypes.asInstanceOf[Seq[Ast]]
+        /**returnTypes.asInstanceOf[Seq[Ast]].map((ast: Ast) => {
+          if (ast.root.get.isInstanceOf[NewMethodReturn]) ast else {
+            Ast(ast.nodes(1).asInstanceOf[NewNode])
+          }
+        })**/
+      }
+    }
+    val methodAst = Ast(method)
       .withChildren(parameters)
       .withChild(body)
       .withChildren(modifiers.map(Ast(_)))
       .withChildren(annotations)
-      .withChild(Ast(methodReturn))
+      .withChildren(methodReturnAsts)
+
+    // for (returnNode: Ast <- methodReturnAsts) methodAst.withChildren()
+    methodAst
+  }
 
   /** Creates an AST that represents a method stub, containing information about the method, its parameters, and the
     * return type.
