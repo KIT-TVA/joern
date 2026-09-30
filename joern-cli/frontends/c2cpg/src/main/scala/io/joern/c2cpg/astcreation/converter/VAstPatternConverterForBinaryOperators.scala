@@ -4,7 +4,7 @@ import io.joern.c2cpg.astcreation.{Defines, VAstCreatorNew}
 import io.joern.x2cpg.Ast
 import io.shiftleft.codepropertygraph.generated.{DispatchTypes, Operators}
 import io.shiftleft.codepropertygraph.generated.nodes.{NewIdentifier, NewLiteral}
-import xtc.tree.{Location, Node}
+import xtc.tree.Node
 
 class VAstPatternConverterForBinaryOperators(vAstCreator: VAstCreatorNew, converter: VAstConverter)
   extends VAstPatternConverter(
@@ -134,10 +134,7 @@ class VAstPatternConverterForBinaryOperators(vAstCreator: VAstCreatorNew, conver
     ""
   }
 
-  private def locationOf(node: Node): (Option[Int], Option[Int]) = {
-    val loc: Location = node.getLocation
-    if (loc == null) (None, None) else (Option(loc.line), Option(loc.column))
-  }
+  private def locationOf(node: Node): (Option[Int], Option[Int]) = VAstLiteralLocation.of(node)
 
   private def astCode(ast: Ast): String =
     ast.root.flatMap(n => codeFromProperty(n.properties.get("CODE"))).getOrElse("")

@@ -4,7 +4,7 @@ import io.joern.c2cpg.astcreation.{Defines, VAstCreatorNew}
 import io.joern.x2cpg.{Ast, AstEdge}
 import io.shiftleft.codepropertygraph.generated.nodes.{NewIdentifier, NewLiteral, NewNode}
 import io.shiftleft.codepropertygraph.generated.ControlStructureTypes
-import xtc.tree.{Location, Node}
+import xtc.tree.Node
 
 import scala.collection.mutable.ListBuffer
 
@@ -453,10 +453,7 @@ class VAstPatternConverterForSwitch(vAstCreator: VAstCreatorNew, converter: VAst
   private def getChildren(node: Node): Seq[Node] =
     (0 until node.size()).flatMap(i => safeNodeAt(node, i))
 
-  private def locationOf(node: Node): (Option[Int], Option[Int]) = {
-    val loc: Location = node.getLocation
-    if (loc == null) (None, None) else (Option(loc.line), Option(loc.column))
-  }
+  private def locationOf(node: Node): (Option[Int], Option[Int]) = VAstLiteralLocation.of(node)
 
   private def astCode(ast: Ast): String =
     ast.root.flatMap(n => propString(n.properties.get("CODE"))).getOrElse("")

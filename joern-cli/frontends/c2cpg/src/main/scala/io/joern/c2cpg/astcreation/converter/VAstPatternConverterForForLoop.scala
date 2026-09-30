@@ -4,7 +4,7 @@ import io.joern.c2cpg.astcreation.VAstCreatorNew
 import io.joern.x2cpg.Ast
 import io.shiftleft.codepropertygraph.generated.ControlStructureTypes
 import io.shiftleft.codepropertygraph.generated.nodes.NewLocal
-import xtc.tree.{Location, Node}
+import xtc.tree.Node
 
 /** SuperC: IterationStatement / ForStatement for `for (...; ...; ...) { ... }` (Task 20). */
 class VAstPatternConverterForForLoop(vAstCreator: VAstCreatorNew, converter: VAstConverter)
@@ -36,10 +36,11 @@ class VAstPatternConverterForForLoop(vAstCreator: VAstCreatorNew, converter: VAs
         initAsts.partition(_.root.exists(_.isInstanceOf[NewLocal]))
       val conditionAsts = convertOptional(condNode, converterState)
       val updateAsts    = convertOptional(updateNode, converterState)
-      val bodyAst       = converter.convert(bodyNode, converterState)
+      val bodyAst       = converter.convert(bodyNode, converterState).head
 
       val (line, column) = locationOf(forNode)
-      val code = s"for (${astCodeSeq(plainInitAsts)}; ${astCodeSeq(conditionAsts)}; ${astCodeSeq(updateAsts)})"
+      val code =
+        s"for (${astCodeSeq(plainInitAsts)}; ${astCodeSeq(conditionAsts)}; ${astCodeSeq(updateAsts)}) { ${astCode(bodyAst)} }"
       val controlNode =
         vAstCreator.controlStructureNodeHelper(forNode, ControlStructureTypes.FOR, code, line, column)
       Option(
@@ -125,10 +126,7 @@ class VAstPatternConverterForForLoop(vAstCreator: VAstCreatorNew, converter: VAs
   private def getChildren(node: Node): Seq[Node] =
     (0 until node.size()).flatMap(i => safeNodeAt(node, i))
 
-  private def locationOf(node: Node): (Option[Int], Option[Int]) = {
-    val loc: Location = node.getLocation
-    if (loc == null) (None, None) else (Option(loc.line), Option(loc.column))
-  }
+  private def locationOf(node: Node): (Option[Int], Option[Int]) = VAstLiteralLocation.of(node)
 
   private def astCode(ast: Ast): String =
     ast.root.flatMap(n => codeFromProperty(n.properties.get("CODE"))).getOrElse("")

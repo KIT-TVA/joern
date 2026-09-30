@@ -15,12 +15,35 @@ class testFor extends C2CpgSuite(withOssDataflow = true) {
       |  for (int i = 0; i < 42; i++) {
       |    print(i);
       |  }
+      |
+      |
+      |  for (int
+      |  #if M0
+      |  i = 0
+      |  #else
+      |  i = 1
+      |  #endif
+      |  ;
+      |  #if M1
+      |  i < 42
+      |  #else
+      |  i < 10
+      |  #endif
+      |  ;
+      |  #if M2
+      |  i++
+      |  #else
+      |  i += 2
+      |  #endif
+      |  ) {
+      |    print(i);
+      |  }
       |}
       |""".stripMargin
 
   val cCpg: TestCpg = code(cCode, "test_c_file.c")
   val cTraversal: Iterator[Method] = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
-  val cAstDotString: Iterator[String] = DotAstGenerator.dotAst(cTraversal, extendedView = true)
+  val cAstDotString: Iterator[String] = DotAstGenerator.dotAst(cTraversal, extendedView=true, withColoring=true)
   println("Standard Joern C AST:")
   println(cAstDotString.mkString)
 

@@ -2,7 +2,7 @@ package io.joern.c2cpg.astcreation.converter
 
 import io.joern.c2cpg.astcreation.VAstCreatorNew
 import io.joern.x2cpg.Ast
-import xtc.tree.{Location, Node}
+import xtc.tree.Node
 
 /** SuperC: IterationStatement for `while` and `do-while` (Task 19). */
 class VAstPatternConverterForWhileLoop(vAstCreator: VAstCreatorNew, converter: VAstConverter)
@@ -32,7 +32,7 @@ class VAstPatternConverterForWhileLoop(vAstCreator: VAstCreatorNew, converter: V
       if (conditionAst.root.isEmpty) None
       else {
         val (line, column) = locationOf(iterationNode)
-        val code           = s"while (${astCode(conditionAst)})"
+        val code           = s"while (${astCode(conditionAst)}) { ${bodyCode(bodyAst)} }"
         Option(
           vAstCreator.whileAst(
             Option(conditionAst),
@@ -98,10 +98,7 @@ class VAstPatternConverterForWhileLoop(vAstCreator: VAstCreatorNew, converter: V
   private def astCode(ast: Ast): String =
     ast.root.flatMap(n => codeFromProperty(n.properties.get("CODE"))).getOrElse("")
 
-  private def locationOf(node: Node): (Option[Int], Option[Int]) = {
-    val loc: Location = node.getLocation
-    if (loc == null) (None, None) else (Option(loc.line), Option(loc.column))
-  }
+  private def locationOf(node: Node): (Option[Int], Option[Int]) = VAstLiteralLocation.of(node)
 
   private def codeFromProperty(value: Any): Option[String] = value match {
     case null            => None

@@ -4,7 +4,7 @@ import io.joern.c2cpg.astcreation.{Defines, VAstCreatorNew}
 import io.joern.x2cpg.Ast
 import io.shiftleft.codepropertygraph.generated.{DispatchTypes, Operators}
 import io.shiftleft.codepropertygraph.generated.nodes.{NewIdentifier, NewLiteral}
-import xtc.tree.{Location, Node}
+import xtc.tree.Node
 
 /**
  * SuperC Task 7: plain `enum` → TYPE_DECL + MEMBER (+ optional `green = 20` assignment).
@@ -178,8 +178,5 @@ class VAstPatternConverterForEnum(vAstCreator: VAstCreatorNew, converter: VAstCo
   private def getChildren(node: Node): Seq[Node] =
     (0 until node.size()).flatMap(i => safeNodeAt(node, i))
 
-  private def locationOf(node: Node): (Option[Int], Option[Int]) = {
-    val loc: Location = node.getLocation
-    if (loc == null) (None, None) else (Option(loc.line), Option(loc.column))
-  }
+  private def locationOf(node: Node): (Option[Int], Option[Int]) = VAstLiteralLocation.of(node)
 }

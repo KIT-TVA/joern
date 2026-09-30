@@ -3,7 +3,7 @@ package io.joern.c2cpg.astcreation.converter
 import io.joern.c2cpg.astcreation.VAstCreatorNew
 import io.joern.x2cpg.Ast
 import io.shiftleft.codepropertygraph.generated.ControlStructureTypes
-import xtc.tree.{Location, Node}
+import xtc.tree.Node
 
 /** SuperC: BreakStatement / ContinueStatement (and JumpStatement) — Task 21. */
 class VAstPatternConverterForBreakContinue(vAstCreator: VAstCreatorNew, converter: VAstConverter)
@@ -48,8 +48,5 @@ class VAstPatternConverterForBreakContinue(vAstCreator: VAstCreatorNew, converte
         case _             => Option(node.getNode(index)).map(_.toString).getOrElse("")
       }
 
-  private def locationOf(node: Node): (Option[Int], Option[Int]) = {
-    val loc: Location = node.getLocation
-    if (loc == null) (None, None) else (Option(loc.line), Option(loc.column))
-  }
+  private def locationOf(node: Node): (Option[Int], Option[Int]) = VAstLiteralLocation.of(node)
 }

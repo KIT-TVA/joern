@@ -4,7 +4,7 @@ import io.joern.c2cpg.astcreation.{Defines, VAstCreatorNew}
 import io.joern.x2cpg.Ast
 import io.shiftleft.codepropertygraph.generated.{DispatchTypes, Operators}
 import io.shiftleft.codepropertygraph.generated.nodes.{NewIdentifier, NewTypeRef}
-import xtc.tree.{Location, Node}
+import xtc.tree.Node
 
 /** SuperC: CastExpression / CastExp — type at [0], expression at [1]. Joern: <operator>.cast(TypeRef, expr). */
 class VAstPatternConverterForCast(vAstCreator: VAstCreatorNew, converter: VAstConverter)
@@ -118,10 +118,7 @@ class VAstPatternConverterForCast(vAstCreator: VAstCreatorNew, converter: VAstCo
     } catch { case _: Exception => "" }
   }
 
-  private def locationOf(node: Node): (Option[Int], Option[Int]) = {
-    val loc: Location = node.getLocation
-    if (loc == null) (None, None) else (Option(loc.line), Option(loc.column))
-  }
+  private def locationOf(node: Node): (Option[Int], Option[Int]) = VAstLiteralLocation.of(node)
 
   private def astCode(ast: Ast): String =
     ast.root.flatMap(n => codeFromProperty(n.properties.get("CODE"))).getOrElse("")

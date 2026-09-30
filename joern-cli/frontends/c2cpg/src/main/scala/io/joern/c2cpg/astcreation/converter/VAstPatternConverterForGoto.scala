@@ -3,7 +3,7 @@ package io.joern.c2cpg.astcreation.converter
 import io.joern.c2cpg.astcreation.VAstCreatorNew
 import io.joern.x2cpg.Ast
 import io.shiftleft.codepropertygraph.generated.ControlStructureTypes
-import xtc.tree.{Location, Node}
+import xtc.tree.Node
 
 /**
  * SuperC: `goto` + plain labels (Task 8, plain).
@@ -190,8 +190,5 @@ class VAstPatternConverterForGoto(vAstCreator: VAstCreatorNew, converter: VAstCo
   private def getChildren(node: Node): Seq[Node] =
     (0 until node.size()).flatMap(i => safeNodeAt(node, i))
 
-  private def locationOf(node: Node): (Option[Int], Option[Int]) = {
-    val loc: Location = node.getLocation
-    if (loc == null) (None, None) else (Option(loc.line), Option(loc.column))
-  }
+  private def locationOf(node: Node): (Option[Int], Option[Int]) = VAstLiteralLocation.of(node)
 }

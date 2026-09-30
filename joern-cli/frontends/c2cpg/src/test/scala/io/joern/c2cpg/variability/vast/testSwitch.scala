@@ -2,6 +2,10 @@ package io.joern.c2cpg.variability.vast
 
 import io.joern.c2cpg.testfixtures.C2CpgSuite
 import io.joern.c2cpg.variability.util.TestUtil.generateVASTDot
+import io.joern.x2cpg.testfixtures.TestCpg
+import io.shiftleft.codepropertygraph.generated.nodes
+import io.shiftleft.codepropertygraph.generated.nodes.Method
+import io.shiftleft.semanticcpg.dotgenerator.DotAstGenerator
 
 /** Task 13: switch / case / default (plain). */
 class testSwitch extends C2CpgSuite(withOssDataflow = true) {
@@ -25,6 +29,12 @@ class testSwitch extends C2CpgSuite(withOssDataflow = true) {
       |}
       |""".stripMargin
 
+  val cCpg: TestCpg = code(cCode, "test_c_file.c")
+  val cTraversal: Iterator[Method] = cCpg.graph._nodes(25).asInstanceOf[Iterator[nodes.Method]]
+  val cAstDotString: Iterator[String] = DotAstGenerator.dotAst(cTraversal, extendedView = true, withColoring=true)
+  println("Standard Joern C AST:")
+  println(cAstDotString.mkString)
+    
   val (superCAstDotString, superCJoernAstDotString) = generateVASTDot(cCode, "test_switch.c")
 
   println("\nSuperC (V)AST (original data structure):")

@@ -3,7 +3,7 @@ package io.joern.c2cpg.astcreation.converter
 import io.joern.c2cpg.astcreation.VAstCreatorNew
 import io.joern.x2cpg.Ast
 import io.shiftleft.codepropertygraph.generated.ControlStructureTypes
-import xtc.tree.{Location, Node}
+import xtc.tree.Node
 
 /** SuperC: SelectionStatement for `if` / `else if` / `else` (Task 12). */
 class VAstPatternConverterForIf(vAstCreator: VAstCreatorNew, converter: VAstConverter)
@@ -129,10 +129,7 @@ class VAstPatternConverterForIf(vAstCreator: VAstCreatorNew, converter: VAstConv
   private def astCode(ast: Ast): String =
     ast.root.flatMap(n => codeFromProperty(n.properties.get("CODE"))).getOrElse("")
 
-  private def locationOf(node: Node): (Option[Int], Option[Int]) = {
-    val loc: Location = node.getLocation
-    if (loc == null) (None, None) else (Option(loc.line), Option(loc.column))
-  }
+  private def locationOf(node: Node): (Option[Int], Option[Int]) = VAstLiteralLocation.of(node)
 
   private def codeFromProperty(value: Any): Option[String] = value match {
     case null            => None
