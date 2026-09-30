@@ -64,21 +64,84 @@ class VAstPatternConverterForBinaryOperators(vAstCreator: VAstCreatorNew, conver
   )
 
   override def convert(superCVAst: Node, converterState: VAstConverterState): Option[Seq[Ast]] = {
-    if (superCVAst.size() < 3) None
+    if (superCVAst.size() < 3 && realConditionalIndex(superCVAst).isEmpty) None
     else {
-      val opString = operatorString(superCVAst.getNode(1))
-      val joernOp  = OperatorMap.getOrElse(opString, Defines.OperatorUnknown)
-      val leftAst  = parameterConverter(superCVAst.getNode(0), converterState)
-      val rightAst = parameterConverter(superCVAst.getNode(2), converterState)
-      val (line, column) = locationOf(superCVAst)
-      val code = s"${astCode(leftAst)} $opString ${astCode(rightAst)}".trim
-      val typeFullName = if (joernOp.contains("assignment")) Defines.Void else Defines.Any
-      val call = vAstCreator.callNodeHelper(
-        superCVAst, code, joernOp, joernOp, DispatchTypes.STATIC_DISPATCH, None, Option(typeFullName), line, column
-      )
-      Option(Seq(vAstCreator.callAst(call, List(leftAst, rightAst))))
+      val asts = convertSlots(superCVAst, childSlots(superCVAst), converterState)
+      if (asts.exists(_.root.isDefined)) Option(asts) else None
     }
   }
+
+  /**
+   * `#if M1 i < 42 #else i < 10` is one expression whose child is a Conditional.
+   * Each branch becomes its own call (`i < 42`, `i < 10`) under a CHOICE.
+   * A single call that only keeps the first branch drops the `#else`.
+   */
+  private def convertSlots(origin: Node, slots: Seq[Any], state: VAstConverterState): Seq[Ast] =
+    realConditionalIndex(slots) match {
+      case Some(index) =>
+        slots(index) match {
+          case cond: Node =>
+            conditionalHandler.handleConditional(
+              cond,
+              state,
+              (branch, branchState) => convertSlots(origin, slots.updated(index, branch), branchState)
+            )
+          case _ => foldSlots(origin, slots, state).toSeq
+        }
+      case None =>
+        foldSlots(origin, slots, state).toSeq
+    }
+
+  /** Left-associative: `a + b + c` is `(a + b) + c`. The first triple is always one call. */
+  private def foldSlots(origin: Node, slots: Seq[Any], state: VAstConverterState): Option[Ast] =
+    if (slots.size < 3) None
+    else {
+      var acc = makeCall(origin, operandAst(slots(0), state), operatorText(slots(1)), operandAst(slots(2), state))
+      var i   = 3
+      while (i + 1 < slots.size && OperatorMap.contains(operatorText(slots(i)))) {
+        acc = makeCall(origin, acc, operatorText(slots(i)), operandAst(slots(i + 1), state))
+        i += 2
+      }
+      Option(acc)
+    }
+
+  private def makeCall(origin: Node, leftAst: Ast, opString: String, rightAst: Ast): Ast = {
+    val joernOp        = OperatorMap.getOrElse(opString, Defines.OperatorUnknown)
+    val (line, column) = locationOf(origin)
+    val code           = s"${astCode(leftAst)} $opString ${astCode(rightAst)}".trim
+    val typeFullName   = if (joernOp.contains("assignment")) Defines.Void else Defines.Any
+    val call = vAstCreator.callNodeHelper(
+      origin, code, joernOp, joernOp, DispatchTypes.STATIC_DISPATCH, None, Option(typeFullName), line, column
+    )
+    vAstCreator.callAst(call, List(leftAst, rightAst))
+  }
+
+  private def childSlots(node: Node): Seq[Any] =
+    (0 until node.size()).map(i => node.get(i)).toSeq
+
+  private def realConditionalIndex(node: Node): Option[Int] =
+    realConditionalIndex(childSlots(node))
+
+  private def realConditionalIndex(slots: Seq[Any]): Option[Int] =
+    slots.zipWithIndex.collectFirst {
+      case (child: Node, index)
+        if conditionalHandler.isSuperCConditionalNode(child) &&
+          conditionalHandler.getFirstSuperCCondition(child) != "1" =>
+        index
+    }
+
+  private def operandAst(slot: Any, state: VAstConverterState): Ast =
+    slot match {
+      case node: Node => parameterConverter(node, state)
+      case _          => vAstCreator.AstHelper()
+    }
+
+  private def operatorText(slot: Any): String =
+    slot match {
+      case value: String => value
+      case node: Node    => operatorString(node)
+      case _             => ""
+    }
 
   /**
    * Like FunctionCall arguments: `#ifdef` operands must become CHOICE, not a single
@@ -115,19 +178,50 @@ class VAstPatternConverterForBinaryOperators(vAstCreator: VAstCreatorNew, conver
     vAstCreator.AstHelper(lit)
   }
 
+  /**
+   * SuperC stores `+=` as an AssignmentOperator whose text is nested (`+` and `=`),
+   * not one direct string. Reading only the first string, or defaulting the node to `=`,
+   * turns `<operator>.assignmentPlus` into `<operator>.assignment`.
+   */
   private def operatorString(operatorNode: Node): String = {
-    val fromNode = firstStringChild(operatorNode)
-    if (fromNode.nonEmpty) fromNode
-    else if (operatorNode.getName == "AssignmentOperator") "="
-    else ""
+    val pieces = collectOperatorPieces(operatorNode, 0)
+    val joined = pieces.mkString
+    if (OperatorMap.contains(joined)) joined
+    else
+      pieces.find(OperatorMap.contains).getOrElse {
+        if (operatorNode.getName == "AssignmentOperator") "=" else ""
+      }
   }
+
+  private def collectOperatorPieces(node: Node, depth: Int): Seq[String] = {
+    if (node == null || depth > 3) Seq.empty
+    else {
+      val found = scala.collection.mutable.ListBuffer.empty[String]
+      var i = 0
+      while (i < node.size()) {
+        node.get(i) match {
+          case value: String if isOperatorPiece(value) => found += value
+          case child: Node                             => found ++= collectOperatorPieces(child, depth + 1)
+          case _                                       =>
+        }
+        i += 1
+      }
+      found.toSeq
+    }
+  }
+
+  private def isOperatorPiece(value: String): Boolean =
+    value.nonEmpty && (OperatorMap.contains(value) || "+-*/%<>=!&|^".exists(ch => value == ch.toString))
 
   private def firstStringChild(node: Node): String = {
     var i = 0
     while (i < node.size()) {
       node.get(i) match {
         case value: String => return value
-        case _             =>
+        case child: Node =>
+          val nested = firstStringChild(child)
+          if (nested.nonEmpty) return nested
+        case _ =>
       }
       i += 1
     }
