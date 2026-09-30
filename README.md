@@ -205,7 +205,8 @@ class testComplexFunctionReturnTypes extends C2CpgSuite(withOssDataflow = true) 
   // Creates the JOERN VA-CPG (together with VA-AST, VA-CFG and VA-PDG) using the new variable C-Frontend of JOERN and
   // returns the SuperC VA-AST and JOERN VA-CPGs (extendedView = true, withColoring = true and edge coloring) as
   // dot-graphs.
-  val (superCCpgDotString: String, superCJoernCpgotString: String) = generateVASTDot(cCode, cFileName)
+  val (superCCpgDotString: String, superCJoernCpgotString: String) =
+    generateVASTDot(cCode, cFileName, onlyGlobalGraph = false, onlyVAST = false)
 
   println("\nSuperC VA-AST (original data structure):")
   println(superCCpgDotString)
